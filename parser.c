@@ -314,7 +314,7 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                             
                         } 
 
-                        dynarray_destroy(delta_first_list);
+                        //dynarray_destroy(delta_first_list);
                     }
 
                     if(found_delta_first == false){
@@ -333,7 +333,7 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                             }
                         }
 
-                        dynarray_destroy(delta_first_list);
+                        //dynarray_destroy(delta_first_list);
                     }
                 }
             }
@@ -344,8 +344,7 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
     return s;
 }
 
-Item* goto_table(Grammar G, Item* s_raw, Subset* first, int x){
-    Item* s = dynarray_copy(s_raw);
+Item* goto_table(Grammar G, Item* s, Subset* first, int x){
     Item* moved = dynarray_create(Item);
     
     for(int i = 0;i<dynarray_length(s);i++){
@@ -358,15 +357,13 @@ Item* goto_table(Grammar G, Item* s_raw, Subset* first, int x){
         }
     }
 
-    dynarray_destroy(s);
-
     return closure(G, moved, first);
 }
 
 void c_collection(Grammar G, Subset* first){
     Item start_item;
     start_item.alpha = G.productions[0].alpha;
-    start_item.beta = G.productions[1].beta;
+    start_item.beta = G.productions[0].beta;
     start_item.lookahead = END;
     start_item.k = 0;
 
@@ -389,6 +386,7 @@ void c_collection(Grammar G, Subset* first){
             if(CC[i].marked == false){
                 Subset char_trans = SS_initialize_empty(dynarray_length(G.T)+dynarray_length(G.NT));
                 Item* current_cc = CC[i].cc;
+                CC[i].marked = true;
                 for(int j=0;j<dynarray_length(current_cc);j++){
                     int curr_k = current_cc[j].k;
                     int* curr_beta = current_cc[j].beta;
@@ -400,9 +398,12 @@ void c_collection(Grammar G, Subset* first){
                 for(int j=0;j<char_trans.capacity;j++){
                     if(char_trans.table[j]==true){
                         Item* temp = goto_table(G, current_cc, first, j);
-                        if(hash_add(HCC, temp, hash_item_list_equal)){
+                        CC_Item cci;
+                        cci.cc = temp;
+                        cci.marked = false;
+                        if(!hash_add(HCC, temp, hash_item_list_equal)){
                             added_set = true;
-                            dynarray_push(CC, temp);
+                            dynarray_push(CC, cci);
                         }
                     }
                 }
@@ -410,6 +411,15 @@ void c_collection(Grammar G, Subset* first){
                 //SS_print(char_trans);
             }
         }
+    }
+
+    printf("OK OK OK?\n");
+    for(int i = 0;i<dynarray_length(CC);i++){
+        printf("---\n");
+        for(int j = 0;j<dynarray_length(CC[i].cc);j++){
+            print_item(CC[i].cc[j]);
+        }
+        printf("---\n");
     }
 }
 
@@ -497,7 +507,7 @@ int main() {
 
     c_collection(G, first);
 
-    Hash my_map = hash_create(5, Item*, hash_item_list);
+    //Hash my_map = hash_create(5, Item*, hash_item_list);
 
     //printf("%llu", hash_item_list(c));
 
