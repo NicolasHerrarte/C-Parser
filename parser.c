@@ -313,7 +313,9 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                             }
                             
                         } 
-                    }    
+
+                        dynarray_destroy(delta_first_list);
+                    }
 
                     if(found_delta_first == false){
                         Subset delta_first = first[s[i].lookahead];
@@ -330,6 +332,8 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                                 change = true;
                             }
                         }
+
+                        dynarray_destroy(delta_first_list);
                     }
                 }
             }
@@ -354,7 +358,7 @@ Item* goto_table(Grammar G, Item* s_raw, Subset* first, int x){
         }
     }
 
-    //dynarray_destroy(s);
+    dynarray_destroy(s);
 
     return closure(G, moved, first);
 }
@@ -397,12 +401,13 @@ void c_collection(Grammar G, Subset* first){
                     if(char_trans.table[j]==true){
                         Item* temp = goto_table(G, current_cc, first, j);
                         if(hash_add(HCC, temp, hash_item_list_equal)){
+                            added_set = true;
                             dynarray_push(CC, temp);
                         }
                     }
                 }
 
-                SS_print(char_trans);
+                //SS_print(char_trans);
             }
         }
     }
@@ -496,22 +501,22 @@ int main() {
 
     //printf("%llu", hash_item_list(c));
 
-    hash_add(my_map, g, hash_item_list_equal);
-    hash_add(my_map, g, hash_item_list_equal);
-    hash_add(my_map, c, hash_item_list_equal);
-    hash_add(my_map, s, hash_item_list_equal);
+    //hash_add(my_map, g, hash_item_list_equal);
+    //hash_add(my_map, g, hash_item_list_equal);
+    //hash_add(my_map, c, hash_item_list_equal);
+    //hash_add(my_map, s, hash_item_list_equal);
 
 
-    Item** tl = my_map.obj_storage;
+    //Item** tl = my_map.obj_storage;
 
 
-    printf("AAAA");
-    for(int i = 0;i<dynarray_length(tl);i++){
-        printf("---\n");
-        for(int j = 0;j<dynarray_length(tl[i]);j++){
-            print_item(tl[i][j]);
-        }
-        printf("---\n");
-    }
+    //printf("AAAA");
+    //for(int i = 0;i<dynarray_length(tl);i++){
+        //printf("---\n");
+        //for(int j = 0;j<dynarray_length(tl[i]);j++){
+            //print_item(tl[i][j]);
+        //}
+        //printf("---\n");
+    //}
     
 }
