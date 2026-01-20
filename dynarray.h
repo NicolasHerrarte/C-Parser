@@ -29,6 +29,7 @@ void *_dynarray_resize(void *arr);
 
 void *_dynarray_push(void *arr, void *xptr);
 void *_dynarray_pushleft(void *arr, void *xptr);
+void _dynarray_replace(void *arr, void *xptr, int index);
 void _dynarray_pop(void *arr, void *dest);
 
 #define DYNARRAY_DEFAULT_CAP 1
@@ -41,6 +42,8 @@ void _dynarray_pop(void *arr, void *dest);
 
 #define dynarray_push(arr, x) arr = _dynarray_push(arr, &x)
 #define dynarray_pushleft(arr, x) arr = _dynarray_pushleft(arr, &x)
+#define dynarray_replace(arr, x, ind) _dynarray_replace(arr, &x, int index)
+
 #define dynarray_push_rval(arr, x) \
     do { \
         __auto_type temp = x; \

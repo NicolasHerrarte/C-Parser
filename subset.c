@@ -45,6 +45,10 @@ Subset SS_initialize(int cap, int* add, int add_amount){
     return subset;
 }
 
+void SS_destroy(Subset* subset){
+    free(subset->table);
+}
+
 Subset SS_deep_copy(Subset subset){
     Subset copy = SS_initialize_empty(subset.capacity);
     copy.count = subset.count;
@@ -74,17 +78,14 @@ void SS_remove(Subset* subset, int rem_state){
     }  
 }
 
-Subset SS_union(Subset subset1, Subset subset2){
-    assert(subset1.capacity == subset2.capacity);
-    Subset subset1_copy = SS_deep_copy(subset1);
-    for(int i = 0;i<subset1_copy.capacity;i++){
-        if(subset1_copy.table[i] == false && subset2.table[i] == true){
-            subset1_copy.count ++;
-            subset1_copy.table[i] = true;
+Subset _SS_union(Subset* subset1, Subset subset2){
+    assert(subset1->capacity == subset2.capacity);
+    for(int i = 0;i<subset1->capacity;i++){
+        if(subset1->table[i] == false && subset2.table[i] == true){
+            subset1->count ++;
+            subset1->table[i] = true;
         }
     }
-
-    return subset1_copy;
 }
 
 bool SS_equal(Subset subset1, Subset subset2){

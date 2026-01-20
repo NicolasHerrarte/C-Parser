@@ -1,4 +1,5 @@
 #include "dynarray.h"
+#include <assert.h>
 
 /*
 
@@ -90,6 +91,13 @@ void *_dynarray_pushleft(void *arr, void *xptr)
     memcpy(arr, xptr, dynarray_stride(arr));
     _dynarray_field_set(arr, LENGTH, dynarray_length(arr) + 1);
     return arr;
+}
+
+void _dynarray_replace(void *arr, void *xptr, int index)
+{
+    assert(index < dynarray_length(arr));
+    assert(index >= 0);
+    memcpy(arr + index * dynarray_stride(arr), xptr, dynarray_stride(arr));
 }
 
 // Removes the last element in the array, but copies it to `*dest` first.
