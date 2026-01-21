@@ -26,7 +26,7 @@ typedef struct Production{
 
 typedef struct Item{
     int alpha;
-    int* beta;
+    int** beta;
     int lookahead;
     int k;
 } Item;
@@ -53,11 +53,11 @@ bool item_equal(Item item1, Item item2){
     if(item1.k != item2.k){
         return false;
     }
-    if(dynarray_length(item1.beta) != dynarray_length(item2.beta)){
+    if(dynarray_length(*item1.beta) != dynarray_length(*item2.beta)){
         return false;
     }
-    for(int i = 0;i<dynarray_length(item1.beta);i++){
-        if(item1.beta[i] != item2.beta[i]){
+    for(int i = 0;i<dynarray_length(*item1.beta);i++){
+        if((*item1.beta)[i] != (*item2.beta)[i]){
             return false;
         }
     }
@@ -77,18 +77,29 @@ bool item_in(Item* items, Item find_item){
 Item item_copy(Item original){
     Item new_item;
     new_item.alpha = original.alpha;
-    new_item.beta = dynarray_copy(original.beta);
+    new_item.beta = original.beta;
     new_item.lookahead = original.lookahead;
     new_item.k = original.k;
 
     return new_item;
 }
 
+Item* item_list_copy(Item* original){
+    Item* item_list = dynarray_create_prealloc(Item, dynarray_length(original));
+
+    for(int i = 0;i<dynarray_length(original); i++){
+        Item new_item = item_copy(original[i]);
+        dynarray_push(item_list, new_item);
+    }
+
+    return item_list;
+}
+
 uint64_t hash_item(void* item_ptr){
     Item item = *((Item*) item_ptr);
     uint64_t curr_hash_int = hash_int(item.alpha);
-    for(int i=0;i<dynarray_length(item.beta);i++){
-        uint64_t tmp_hash_beta = hash_int(item.beta[i]);
+    for(int i=0;i<dynarray_length(*item.beta);i++){
+        uint64_t tmp_hash_beta = hash_int((*item.beta)[i]);
         curr_hash_int = hash_combine(curr_hash_int, tmp_hash_beta);
     }
     uint64_t tmp_hash_k = hash_int(item.k);
@@ -108,13 +119,13 @@ bool hash_item_equal(void* a, void* b) {
     if (item_a->lookahead != item_b->lookahead) return false;
     if (item_a->k != item_b->k) return false;
 
-    int len_a = dynarray_length(item_a->beta);
-    int len_b = dynarray_length(item_b->beta);
+    int len_a = dynarray_length(*item_a->beta);
+    int len_b = dynarray_length(*item_b->beta);
 
     if (len_a != len_b) return false;
 
     for (int i = 0; i < len_a; i++) {
-        if (item_a->beta[i] != item_b->beta[i]) {
+        if ((*item_a->beta)[i] != (*item_b->beta)[i]) {
             return false;
         }
     }
@@ -155,11 +166,11 @@ bool hash_item_list_equal(void* a_ptr, void* b_ptr) {
 
 void print_item(Item item){
     printf("[ %d -> ", item.alpha);
-    for(int i = 0;i<dynarray_length(item.beta);i++){
+    for(int i = 0;i<dynarray_length(*item.beta);i++){
         if(i != -1 && i == item.k){
             printf("*");
         }
-        printf("%d ", item.beta[i]);
+        printf("%d ", (*item.beta)[i]);
     }
     printf(", %d ]\n", item.lookahead);
 }
@@ -274,25 +285,26 @@ Subset* generate_first(Grammar G){
 
 Item* closure(Grammar G, Item* s_raw, Subset* first){
     bool change = false;
-    Item* s = dynarray_copy(s_raw);
+    Item* s = item_list_copy(s_raw);
     int counter = 0;
-    do{
-        //printf("SHIT ---\n");
-        //for(int PUTA = 0;PUTA<dynarray_length(s);PUTA++){
+
+    //printf("SHIT ---\n");
+        for(int PUTA = 0;PUTA<dynarray_length(s);PUTA++){
             //print_item(s[PUTA]);
-        //}
-        //printf("SHIT ---\n");
+        }
+    //printf("SHIT ---\n");
+    do{
         change = false;
         for(int i = 0;i<dynarray_length(s);i++){
             int curr_k = s[i].k;
-            int C = s[i].beta[curr_k];
-            int beta_length = dynarray_length(s[i].beta);
+            int C = (*s[i].beta)[curr_k];
+            int beta_length = dynarray_length(*s[i].beta);
             for(int j = 0;j<dynarray_length(G.productions);j++){
                 if(G.productions[j].alpha == C){
 
                     bool found_delta_first = false;
                     for(int delta_index=curr_k+1;delta_index<beta_length;delta_index++){
-                        int delta = s[i].beta[delta_index];
+                        int delta = (*s[i].beta)[delta_index];
                         if(delta == EPSILON){
                             continue;
                         }
@@ -303,7 +315,7 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                         for(int b=0;b<dynarray_length(delta_first_list);b++){
                             Item new_item;
                             new_item.alpha = C;
-                            new_item.beta = G.productions[j].beta;
+                            new_item.beta = &G.productions[j].beta;
                             new_item.lookahead = delta_first_list[b];
                             new_item.k = 0;
                             
@@ -323,9 +335,15 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                         for(int b=0;b<dynarray_length(delta_first_list);b++){
                             Item new_item;
                             new_item.alpha = C;
-                            new_item.beta = G.productions[j].beta;
+                            new_item.beta = &G.productions[j].beta;
                             new_item.lookahead = delta_first_list[b];
                             new_item.k = 0;
+
+                            //printf("KURWA ---\n");
+                            for(int PUTA = 0;PUTA<dynarray_length(s);PUTA++){
+                                //print_item(s[PUTA]);
+                            }
+                            //printf("KURWA ---\n");
                             
                             if(!item_in(s, new_item)){
                                 dynarray_push(s, new_item);
@@ -349,7 +367,7 @@ Item* goto_table(Grammar G, Item* s, Subset* first, int x){
     
     for(int i = 0;i<dynarray_length(s);i++){
         int k_pos = s[i].k;
-        if(k_pos < dynarray_length(s[i].beta) && s[i].beta[k_pos] == x){
+        if(k_pos < dynarray_length(*s[i].beta) && (*s[i].beta)[k_pos] == x){
             Item new_item = item_copy(s[i]);
             new_item.k ++;
 
@@ -363,7 +381,7 @@ Item* goto_table(Grammar G, Item* s, Subset* first, int x){
 void c_collection(Grammar G, Subset* first){
     Item start_item;
     start_item.alpha = G.productions[0].alpha;
-    start_item.beta = G.productions[0].beta;
+    start_item.beta = &G.productions[0].beta;
     start_item.lookahead = END;
     start_item.k = 0;
 
@@ -389,7 +407,7 @@ void c_collection(Grammar G, Subset* first){
                 CC[i].marked = true;
                 for(int j=0;j<dynarray_length(current_cc);j++){
                     int curr_k = current_cc[j].k;
-                    int* curr_beta = current_cc[j].beta;
+                    int* curr_beta = *current_cc[j].beta;
                     if(curr_k<dynarray_length(curr_beta)){
                         SS_add(&char_trans, curr_beta[curr_k]);
                     }
@@ -413,7 +431,7 @@ void c_collection(Grammar G, Subset* first){
         }
     }
 
-    printf("OK OK OK?\n");
+    //printf("OK OK OK?\n");
     for(int i = 0;i<dynarray_length(CC);i++){
         printf("---\n");
         for(int j = 0;j<dynarray_length(CC[i].cc);j++){
@@ -481,13 +499,34 @@ int main() {
     
     Item initial_item;
     initial_item.alpha = GOAL;
-    initial_item.beta = dynarray_create(int);
-    dynarray_push_rval(initial_item.beta, LIST);
+    int* master_beta = dynarray_create(int);
+    initial_item.beta = &master_beta;
+    dynarray_push_rval(*initial_item.beta, LIST);
     initial_item.lookahead = END;
     initial_item.k = 0;
 
+    Item initial_item1;
+    initial_item1.alpha = LIST;
+    int* master_beta1 = dynarray_create(int);
+    initial_item1.beta = &master_beta1;
+    dynarray_push_rval(*initial_item1.beta, LIST);
+    dynarray_push_rval(*initial_item1.beta, PAIR);
+    initial_item1.lookahead = END;
+    initial_item1.k = 1;
+
+    Item initial_item2;
+    initial_item2.alpha = LIST;
+    int* master_beta2 = dynarray_create(int);
+    initial_item2.beta = &master_beta2;
+    dynarray_push_rval(*initial_item2.beta, LIST);
+    dynarray_push_rval(*initial_item2.beta, PAIR);
+    initial_item2.lookahead = LEFT_PAR;
+    initial_item2.k = 1;
+
     Item* s = dynarray_create(Item);
     dynarray_push(s, initial_item);
+    dynarray_push(s, initial_item1);
+    dynarray_push(s, initial_item2);
 
     printf("What\n");
     printf("%d\n", dynarray_length(s));
@@ -504,7 +543,7 @@ int main() {
     for(int i = 0;i<dynarray_length(g);i++){
         print_item(g[i]);
     }
-
+    printf("Moment of Truth\n");
     c_collection(G, first);
 
     //Hash my_map = hash_create(5, Item*, hash_item_list);
