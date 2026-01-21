@@ -83,6 +83,29 @@ bool _hash_in(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), int 
     return false;
 }
 
+void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*)){
+    uint64_t hash_id = hash->f_ptr(xptr);
+
+    int bucket_id = hash_id%(hash->capacity);
+    
+    Node* slot = hash->table[bucket_id];
+    if(slot != NULL){
+        Node* tmp = slot;
+        Node* prev = NULL;
+
+        while(tmp != NULL){
+            uint64_t curr_hash_id = hash->f_ptr((char*) hash->obj_storage + tmp->storage_index * hash->stride);
+            if(hash_id == curr_hash_id && f_equality_ptr(xptr, (char*) hash->obj_storage + tmp->storage_index * hash->stride)){
+                return (void*)((char*) hash->obj_storage + tmp->storage_index * hash->stride);            
+            }
+            prev = tmp;
+            tmp = tmp->next;
+        }
+    }
+
+    return NULL;
+}
+
 void *_hash_to_list(Hash *hash){
     void* arr = _dynarray_create(hash->count, hash->stride);
     for(int i=0;i<hash->capacity;i++){

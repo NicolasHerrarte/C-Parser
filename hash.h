@@ -4,6 +4,7 @@
 
 #define hash_create(node_amount, type, ptr_func) _hash_create(node_amount, sizeof(type), ptr_func)
 #define hash_in(hash, xptr, func) _hash_in(&hash, &xptr, func, 0)
+#define hash_get(hash, xptr, func) _hash_get(&hash, &xptr, func)
 #define hash_add(hash, xptr, func) _hash_in(&hash, &xptr, func, 1)
 #define hash_remove(hash, xptr, func) _hash_in(&hash, &xptr, func, -1)
 #define hash_to_list(hash) _hash_to_list(&hash)
@@ -26,6 +27,7 @@ typedef struct Hash{
 
 Hash _hash_create(int node_amount, size_t stride, void* ptr_func);
 bool _hash_in(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), int action);
+void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*));
 void *_hash_to_list(Hash *hash);
 uint64_t _hash_int(void *xptr);
 uint64_t hash_combine( uint64_t lhs, uint64_t rhs );

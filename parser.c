@@ -33,6 +33,7 @@ typedef struct Item{
 
 typedef struct CC_Item{
     Item* cc;
+    int state;
     bool marked;
 } CC_Item;
 
@@ -42,6 +43,23 @@ typedef struct Grammar{
     int S;
     Production* productions;
 } Grammar;
+
+// From Scanner
+typedef struct LRTransition{
+    int state_from;
+    int state_to;
+    int trans_symbol;
+} LRTransition;
+
+void print_transition(LRTransition t){
+    printf("State: ");
+    printf("%d ", t.state_from);
+    printf("- ");
+    printf("%d ", t.trans_symbol);
+    printf("-> State: ");
+    printf("%d", t.state_to);
+    printf("\n");
+}
 
 bool item_equal(Item item1, Item item2){
     if(item1.alpha != item2.alpha){
@@ -162,6 +180,18 @@ bool hash_item_list_equal(void* a_ptr, void* b_ptr) {
     }
 
     return true;
+}
+
+uint64_t hash_CC_item(void* CC_ptr){
+    CC_Item* item = (CC_Item*) CC_ptr;
+    return hash_item_list(&item->cc);
+}
+
+bool hash_CC_item_equal(void* a_ptr, void* b_ptr){
+    CC_Item* item_a = (CC_Item*)a_ptr;
+    CC_Item* item_b = (CC_Item*)b_ptr;
+
+    return(hash_item_list_equal(&item_a->cc, &item_b->cc));
 }
 
 void print_item(Item item){
@@ -289,9 +319,9 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
     int counter = 0;
 
     //printf("SHIT ---\n");
-        for(int PUTA = 0;PUTA<dynarray_length(s);PUTA++){
+        //for(int PUTA = 0;PUTA<dynarray_length(s);PUTA++){
             //print_item(s[PUTA]);
-        }
+        //}
     //printf("SHIT ---\n");
     do{
         change = false;
@@ -326,7 +356,7 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                             
                         } 
 
-                        //dynarray_destroy(delta_first_list);
+                        dynarray_destroy(delta_first_list);
                     }
 
                     if(found_delta_first == false){
@@ -340,9 +370,9 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                             new_item.k = 0;
 
                             //printf("KURWA ---\n");
-                            for(int PUTA = 0;PUTA<dynarray_length(s);PUTA++){
+                            //for(int PUTA = 0;PUTA<dynarray_length(s);PUTA++){
                                 //print_item(s[PUTA]);
-                            }
+                            //}
                             //printf("KURWA ---\n");
                             
                             if(!item_in(s, new_item)){
@@ -351,7 +381,7 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                             }
                         }
 
-                        //dynarray_destroy(delta_first_list);
+                        dynarray_destroy(delta_first_list);
                     }
                 }
             }
@@ -393,9 +423,10 @@ void c_collection(Grammar G, Subset* first){
     cc0.marked = false;
 
     CC_Item* CC = dynarray_create(CC_Item);
-    Hash HCC = hash_create(2048, Item*, hash_item_list);
+    LRTransition* trans = dynarray_create(LRTransition);
+    Hash HCC = hash_create(2048, CC_Item, hash_CC_item);
     dynarray_push(CC, cc0);
-    hash_add(HCC, cc0.cc, hash_item_list_equal);
+    hash_add(HCC, cc0, hash_CC_item_equal);
 
     bool added_set = true;
     while(added_set){
@@ -416,13 +447,30 @@ void c_collection(Grammar G, Subset* first){
                 for(int j=0;j<char_trans.capacity;j++){
                     if(char_trans.table[j]==true){
                         Item* temp = goto_table(G, current_cc, first, j);
-                        CC_Item cci;
-                        cci.cc = temp;
-                        cci.marked = false;
-                        if(!hash_add(HCC, temp, hash_item_list_equal)){
+                        CC_Item temp_item;
+                        LRTransition new_transition;
+                        new_transition.state_from = i;
+                        new_transition.trans_symbol = j;
+
+                        temp_item.cc = temp;
+                        temp_item.marked = false;
+                        temp_item.state = dynarray_length(CC);
+                        if(!hash_add(HCC, temp_item, hash_CC_item_equal)){
+                            new_transition.state_to = temp_item.state;
                             added_set = true;
-                            dynarray_push(CC, cci);
+                            dynarray_push(CC, temp_item);
                         }
+                        else{
+                            void* stored_ptr = hash_get(HCC, temp_item, hash_CC_item_equal);
+                            if (stored_ptr != NULL) {
+                                CC_Item* stored_item = (CC_Item*) stored_ptr;
+                                //printf("Lengths: %d\n", dynarray_length(CC));
+                                //printf("Stored State: %d\n", stored_item->state);
+                                new_transition.state_to = stored_item->state;
+                            }     
+                        }
+
+                        dynarray_push(trans, new_transition);
                     }
                 }
 
@@ -438,6 +486,11 @@ void c_collection(Grammar G, Subset* first){
             print_item(CC[i].cc[j]);
         }
         printf("---\n");
+    }
+
+    for(int i = 0;i<dynarray_length(trans);i++){
+        printf("---\n");
+        print_transition(trans[i]);
     }
 }
 
