@@ -51,6 +51,11 @@ typedef struct LRTransition{
     int trans_symbol;
 } LRTransition;
 
+typedef struct CC_and_Transitions{
+    CC_Item* CC;
+    LRTransition* goto_transitions;
+} CC_and_Transitions;
+
 void print_transition(LRTransition t){
     printf("State: ");
     printf("%d ", t.state_from);
@@ -408,7 +413,7 @@ Item* goto_table(Grammar G, Item* s, Subset* first, int x){
     return closure(G, moved, first);
 }
 
-void c_collection(Grammar G, Subset* first){
+CC_and_Transitions c_collection(Grammar G, Subset* first){
     Item start_item;
     start_item.alpha = G.productions[0].alpha;
     start_item.beta = &G.productions[0].beta;
@@ -480,18 +485,22 @@ void c_collection(Grammar G, Subset* first){
     }
 
     //printf("OK OK OK?\n");
-    for(int i = 0;i<dynarray_length(CC);i++){
-        printf("---\n");
-        for(int j = 0;j<dynarray_length(CC[i].cc);j++){
-            print_item(CC[i].cc[j]);
-        }
-        printf("---\n");
-    }
+    //for(int i = 0;i<dynarray_length(CC);i++){
+        //printf("---\n");
+        //for(int j = 0;j<dynarray_length(CC[i].cc);j++){
+            //print_item(CC[i].cc[j]);
+        //}
+        //printf("---\n");
+    //}
 
-    for(int i = 0;i<dynarray_length(trans);i++){
-        printf("---\n");
-        print_transition(trans[i]);
-    }
+    //for(int i = 0;i<dynarray_length(trans);i++){
+        //printf("---\n");
+        //print_transition(trans[i]);
+    //}
+    CC_and_Transitions fout;
+    fout.CC = CC;
+    fout.goto_transitions = trans;
+    return fout;
 }
 
 bool int_equal(void* a, void* b) {
@@ -596,8 +605,24 @@ int main() {
     for(int i = 0;i<dynarray_length(g);i++){
         print_item(g[i]);
     }
+    
     printf("Moment of Truth\n");
-    c_collection(G, first);
+    CC_and_Transitions table_material = c_collection(G, first);
+    CC_Item* CC = table_material.CC;
+    LRTransition* trans = table_material.goto_transitions;
+
+    for(int i = 0;i<dynarray_length(CC);i++){
+        printf("---\n");
+        for(int j = 0;j<dynarray_length(CC[i].cc);j++){
+            print_item(CC[i].cc[j]);
+        }
+        printf("---\n");
+    }
+
+    for(int i = 0;i<dynarray_length(trans);i++){
+        printf("---\n");
+        print_transition(trans[i]);
+    }
 
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 

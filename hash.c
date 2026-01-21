@@ -39,7 +39,7 @@ bool _hash_in(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), int 
                 
                 if(action == -1){
                     if(prev != NULL){
-                    prev->next = tmp->next;
+                        prev->next = tmp->next;
                     }
                     else{
                         hash->table[bucket_id] = tmp->next;
