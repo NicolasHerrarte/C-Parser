@@ -56,6 +56,16 @@ typedef struct TableMaterial{
     LRTransition* goto_transitions;
 } TableMaterial;
 
+typedef struct TableMapping{
+    int*** table_action;;
+    int** table_goto;
+    int states_count; 
+    int t_count;
+    int nt_count ;
+    int* action_mapping;
+    int* goto_mapping;
+} TableMapping;
+
 void print_transition(LRTransition t){
     printf("State: ");
     printf("%d ", t.state_from);
@@ -506,7 +516,63 @@ TableMaterial c_collection(Grammar G, Subset* first){
     return fout;
 }
 
-void create_tables(Grammar G, TableMaterial tb){
+void print_tables(TableMapping* tm) {
+    if (tm == NULL) return;
+
+    printf("\n--- LR(1) PARSER TABLES (Canonical Closure) ---\n\n");
+
+    // 1. PRINT HEADER ROW (Symbols)
+    // Using tm-> to access struct members
+    printf("%-5s |", "State");
+    for (int j = 0; j < tm->t_count; j++) {
+        printf(" T%-3d |", tm->action_mapping[j]);
+    }
+    for (int j = 0; j < tm->nt_count; j++) {
+        printf(" NT%-2d |", tm->goto_mapping[j]);
+    }
+    printf("\n");
+
+    // 2. PRINT SEPARATOR
+    int total_width = 7 + ((tm->t_count + tm->nt_count) * 8);
+    for (int i = 0; i < total_width; i++) printf("-");
+    printf("\n");
+
+    // 3. PRINT TABLE ROWS
+    for (int i = 0; i < tm->states_count; i++) {
+        // Print Current State ID
+        printf("%-5d |", i);
+
+        // ACTION TABLE COLUMNS
+        for (int j = 0; j < tm->t_count; j++) {
+            int action_type = tm->table_action[i][j][0]; 
+            int action_val  = tm->table_action[i][j][1];
+
+            if (action_type == 2) {
+                printf(" s%-3d |", action_val);
+            } else if (action_type == 1) {
+                printf(" acc  |");
+            } else if (action_val == 3) {
+                printf(" r%-3d |", action_type + 1); 
+            } else {
+                printf("      |");
+            }
+        }
+
+        // GOTO TABLE COLUMNS
+        for (int j = 0; j < tm->nt_count; j++) {
+            int state_to = tm->table_goto[i][j];
+            if (state_to != -1) {
+                printf(" %-4d |", state_to);
+            } else {
+                printf("      |");
+            }
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+TableMapping create_tables(Grammar G, TableMaterial tb){
     int t_length = dynarray_length(G.T);
     int nt_length = dynarray_length(G.NT);
     int states_count = dynarray_length(tb.CC);
@@ -514,22 +580,33 @@ void create_tables(Grammar G, TableMaterial tb){
     Subset fast_terminal = SS_initialize(t_length+nt_length, G.T,t_length);
     Subset counted = SS_initialize_empty(t_length+nt_length);
     int* symbols_mapping = malloc((t_length+nt_length) * sizeof(int));
+    int* action_mapping = dynarray_create(int);
+    int* goto_mapping = dynarray_create(int);
+    
 
     int t_count = 1;
     int nt_count = 0;
 
     SS_add(&counted, END);
     symbols_mapping[END] = 0;
+
+    int end_rval = END;
+    dynarray_push(action_mapping, end_rval);
+
+    printf("--- Mappings ---\n");
+
     for(int i=0;i<dynarray_length(tb.goto_transitions);i++){
         int curr_symbol = tb.goto_transitions[i].trans_symbol;
         if(!SS_in(counted, curr_symbol)){
             if(SS_in(fast_terminal,curr_symbol)){
                 symbols_mapping[curr_symbol] = t_count;
+                dynarray_push(action_mapping, curr_symbol);
                 printf("Terminal[%d] = %d\n", curr_symbol, t_count);
                 t_count ++;
             }
             else{
                 symbols_mapping[curr_symbol] = nt_count;
+                dynarray_push(goto_mapping, curr_symbol);
                 printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
                 nt_count ++;
             }
@@ -537,7 +614,9 @@ void create_tables(Grammar G, TableMaterial tb){
         }
     }
 
+    printf("--- Counts ---\n");
     printf("T: %d, NT: %d\n", t_count, nt_count);
+    printf("--- Actions ---\n");
 
     int*** table_action = malloc(states_count * sizeof(int**));
     for(int i=0;i<dynarray_length(tb.CC);i++){
@@ -549,17 +628,20 @@ void create_tables(Grammar G, TableMaterial tb){
 
     int** table_goto = malloc(states_count * sizeof(int*));
     for(int i=0;i<dynarray_length(tb.CC);i++){
-        table_goto[i] = calloc(nt_count, sizeof(int));
+        table_goto[i] = malloc(nt_count * sizeof(int));
+        memset(table_goto[i], -1, nt_count * sizeof(int));
     }
     
     for(int i=0;i<dynarray_length(tb.goto_transitions);i++){
         LRTransition curr_trans = tb.goto_transitions[i];
         if(SS_in(fast_terminal, curr_trans.trans_symbol)){
             printf("Action[i->%d, c->%d] = shift j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
-            // ACTION[i, c] <- shift j
+            table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][0] = 2;
+            table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][1] = curr_trans.state_to;
         }
         else{
             printf("Goto[i->%d, n->%d] = j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
+            table_goto[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]] = curr_trans.state_to;
         }
     }
 
@@ -570,6 +652,7 @@ void create_tables(Grammar G, TableMaterial tb){
             if(curr_item.k == dynarray_length(curr_beta)){
                 if(curr_item.alpha == GOAL){
                     printf("Action[i->%d, a->%d] = acc\n", i, curr_item.lookahead);
+                    table_action[i][symbols_mapping[curr_item.lookahead]][0] = 1;
                 }
                 else{
                     int p_rule = -1;
@@ -580,10 +663,23 @@ void create_tables(Grammar G, TableMaterial tb){
                         }
                     }
                     printf("Action[i->%d, a->%d] = reduce p->%d\n", i, curr_item.lookahead, p_rule+1);
+                    table_action[i][symbols_mapping[curr_item.lookahead]][1] = 3;
+                    table_action[i][symbols_mapping[curr_item.lookahead]][0] = p_rule;
                 }
             }
         }
     }
+    
+    TableMapping t_mapping;
+    t_mapping.table_action = table_action;
+    t_mapping.table_goto = table_goto;
+    t_mapping.states_count = states_count;
+    t_mapping.t_count = t_count;
+    t_mapping.nt_count = nt_count;
+    t_mapping.action_mapping = action_mapping;
+    t_mapping.goto_mapping = goto_mapping;
+
+    return t_mapping;
 }
 
 bool int_equal(void* a, void* b) {
@@ -707,7 +803,8 @@ int main() {
         print_transition(trans[i]);
     }
 
-    create_tables(G, table_material);
+    TableMapping tables_info = create_tables(G, table_material);
+    print_tables(&tables_info);
 
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 
