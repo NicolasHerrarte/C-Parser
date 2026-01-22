@@ -51,10 +51,10 @@ typedef struct LRTransition{
     int trans_symbol;
 } LRTransition;
 
-typedef struct CC_and_Transitions{
+typedef struct TableMaterial{
     CC_Item* CC;
     LRTransition* goto_transitions;
-} CC_and_Transitions;
+} TableMaterial;
 
 void print_transition(LRTransition t){
     printf("State: ");
@@ -413,7 +413,7 @@ Item* goto_table(Grammar G, Item* s, Subset* first, int x){
     return closure(G, moved, first);
 }
 
-CC_and_Transitions c_collection(Grammar G, Subset* first){
+TableMaterial c_collection(Grammar G, Subset* first){
     Item start_item;
     start_item.alpha = G.productions[0].alpha;
     start_item.beta = &G.productions[0].beta;
@@ -469,17 +469,19 @@ CC_and_Transitions c_collection(Grammar G, Subset* first){
                             void* stored_ptr = hash_get(HCC, temp_item, hash_CC_item_equal);
                             if (stored_ptr != NULL) {
                                 CC_Item* stored_item = (CC_Item*) stored_ptr;
+                                new_transition.state_to = stored_item->state;
                                 //printf("Lengths: %d\n", dynarray_length(CC));
                                 //printf("Stored State: %d\n", stored_item->state);
-                                new_transition.state_to = stored_item->state;
-                            }     
+                            }
+
+                            dynarray_destroy(temp);
                         }
 
                         dynarray_push(trans, new_transition);
                     }
                 }
 
-                //SS_print(char_trans);
+                SS_destroy(&char_trans);
             }
         }
     }
@@ -497,10 +499,91 @@ CC_and_Transitions c_collection(Grammar G, Subset* first){
         //printf("---\n");
         //print_transition(trans[i]);
     //}
-    CC_and_Transitions fout;
+
+    TableMaterial fout;
     fout.CC = CC;
     fout.goto_transitions = trans;
     return fout;
+}
+
+void create_tables(Grammar G, TableMaterial tb){
+    int t_length = dynarray_length(G.T);
+    int nt_length = dynarray_length(G.NT);
+    int states_count = dynarray_length(tb.CC);
+
+    Subset fast_terminal = SS_initialize(t_length+nt_length, G.T,t_length);
+    Subset counted = SS_initialize_empty(t_length+nt_length);
+    int* symbols_mapping = malloc((t_length+nt_length) * sizeof(int));
+
+    int t_count = 1;
+    int nt_count = 0;
+
+    SS_add(&counted, END);
+    symbols_mapping[END] = 0;
+    for(int i=0;i<dynarray_length(tb.goto_transitions);i++){
+        int curr_symbol = tb.goto_transitions[i].trans_symbol;
+        if(!SS_in(counted, curr_symbol)){
+            if(SS_in(fast_terminal,curr_symbol)){
+                symbols_mapping[curr_symbol] = t_count;
+                printf("Terminal[%d] = %d\n", curr_symbol, t_count);
+                t_count ++;
+            }
+            else{
+                symbols_mapping[curr_symbol] = nt_count;
+                printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
+                nt_count ++;
+            }
+            SS_add(&counted, curr_symbol);
+        }
+    }
+
+    printf("T: %d, NT: %d\n", t_count, nt_count);
+
+    int*** table_action = malloc(states_count * sizeof(int**));
+    for(int i=0;i<dynarray_length(tb.CC);i++){
+        table_action[i] = calloc(t_count, sizeof(int*));
+        for(int j=0;j<t_count;j++){
+            table_action[i][j] = calloc(2, sizeof(int));
+        }
+    }
+
+    int** table_goto = malloc(states_count * sizeof(int*));
+    for(int i=0;i<dynarray_length(tb.CC);i++){
+        table_goto[i] = calloc(nt_count, sizeof(int));
+    }
+    
+    for(int i=0;i<dynarray_length(tb.goto_transitions);i++){
+        LRTransition curr_trans = tb.goto_transitions[i];
+        if(SS_in(fast_terminal, curr_trans.trans_symbol)){
+            printf("Action[i->%d, c->%d] = shift j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
+            // ACTION[i, c] <- shift j
+        }
+        else{
+            printf("Goto[i->%d, n->%d] = j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
+        }
+    }
+
+    for(int i=0;i<dynarray_length(tb.CC);i++){
+        for(int j=0;j<dynarray_length(tb.CC[i].cc);j++){
+            Item curr_item = tb.CC[i].cc[j];
+            int* curr_beta = *curr_item.beta;
+            if(curr_item.k == dynarray_length(curr_beta)){
+                if(curr_item.alpha == GOAL){
+                    printf("Action[i->%d, a->%d] = acc\n", i, curr_item.lookahead);
+                }
+                else{
+                    int p_rule = -1;
+                    for(int k=0;k<dynarray_length(G.productions);k++){
+                        if(G.productions[k].alpha == curr_item.alpha && G.productions[k].beta == *curr_item.beta){
+                            p_rule = k;
+                            break;
+                        }
+                    }
+                    printf("Action[i->%d, a->%d] = reduce p->%d\n", i, curr_item.lookahead, p_rule+1);
+                }
+            }
+        }
+    }
 }
 
 bool int_equal(void* a, void* b) {
@@ -607,7 +690,7 @@ int main() {
     }
     
     printf("Moment of Truth\n");
-    CC_and_Transitions table_material = c_collection(G, first);
+    TableMaterial table_material = c_collection(G, first);
     CC_Item* CC = table_material.CC;
     LRTransition* trans = table_material.goto_transitions;
 
@@ -623,6 +706,8 @@ int main() {
         printf("---\n");
         print_transition(trans[i]);
     }
+
+    create_tables(G, table_material);
 
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 
