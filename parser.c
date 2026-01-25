@@ -51,6 +51,17 @@ typedef struct LRTransition{
     int trans_symbol;
 } LRTransition;
 
+// Scanner Output
+typedef struct Token{
+    char* word;
+    int category;
+} Token;
+
+typedef union StackItem{
+    Token token;
+    int s_int;
+} StackItem;
+
 typedef struct TableMaterial{
     CC_Item* CC;
     LRTransition* goto_transitions;
@@ -64,6 +75,7 @@ typedef struct TableMapping{
     int nt_count ;
     int* action_mapping;
     int* goto_mapping;
+    int* symbols_mapping;
 } TableMapping;
 
 void print_transition(LRTransition t){
@@ -663,8 +675,8 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
                         }
                     }
                     printf("Action[i->%d, a->%d] = reduce p->%d\n", i, curr_item.lookahead, p_rule+1);
-                    table_action[i][symbols_mapping[curr_item.lookahead]][1] = 3;
-                    table_action[i][symbols_mapping[curr_item.lookahead]][0] = p_rule;
+                    table_action[i][symbols_mapping[curr_item.lookahead]][0] = 3;
+                    table_action[i][symbols_mapping[curr_item.lookahead]][1] = p_rule;
                 }
             }
         }
@@ -678,8 +690,116 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     t_mapping.nt_count = nt_count;
     t_mapping.action_mapping = action_mapping;
     t_mapping.goto_mapping = goto_mapping;
+    t_mapping.symbols_mapping = symbols_mapping;
 
     return t_mapping;
+}
+
+void print_stack(StackItem* stack) {
+    int len = dynarray_length(stack);
+    printf("[ ");
+    
+    for (int i = 0; i < len; i++) {
+        // Even index (0, 2, 4...) -> It's a Symbol/Token
+        if (i % 2 == 0) {
+            printf("%d ", stack[i].token.category);
+        } 
+        // Odd index (1, 3, 5...) -> It's a State (int)
+        else {
+            printf("%d ", stack[i].s_int);
+        }
+    }
+    
+    printf("]\n");
+}
+
+void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters){
+    StackItem* stack = dynarray_create_prealloc(StackItem,100);
+    StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
+
+    StackItem first_word;
+    StackItem first_state;
+
+    first_state.s_int = 0;
+
+    first_word.token.word = "WHAT";
+    first_word.token.category = END;
+
+    dynarray_push(stack, first_word);
+    dynarray_push(stack, first_state);
+
+    //printf("STACK: %d\n", first_state.s_int);
+
+    do{
+        StackItem top_state = dynarray_get_last(stack);
+
+        print_stack(stack);
+        printf("Word %d\n", token_ptr->category);
+        printf("State %d\n", top_state.s_int);
+        //printf("Stack Top-> %d\n", top_state.s_int);
+        //printf("Current Word-> %s\n", token_ptr->word);
+
+        int word_category_table = tb.symbols_mapping[token_ptr->category];
+
+        if(tb.table_action[top_state.s_int][word_category_table][0] == 3){
+
+            int prod_rule = tb.table_action[top_state.s_int][word_category_table][1];
+            int A = G.productions[prod_rule].alpha;
+            int* beta = G.productions[prod_rule].beta;
+
+            for(int i=0;i<(2+extra_parameters)*dynarray_length(beta);i++){
+                dynarray_pop(stack, &token_bs[i]);
+            }
+            
+            //printf("stack get %d\n", dynarray_get_last(stack).s_int);
+            //printf("already_mapped %d\n", tb.symbols_mapping[A]);
+            int to_state = tb.table_goto[dynarray_get_last(stack).s_int][tb.symbols_mapping[A]];
+
+            StackItem new_token;
+            StackItem new_state;
+
+            new_token.token.word = "WHAT";
+            new_token.token.category = A;
+
+            new_state.s_int = to_state;
+            
+            dynarray_push(stack, new_token);
+            dynarray_push(stack, new_state);
+           
+            
+            printf("Reduce-> %d\n", prod_rule+1);
+        }
+        else if(tb.table_action[top_state.s_int][word_category_table][0] == 2){
+            int to_state = tb.table_action[top_state.s_int][word_category_table][1];
+
+            StackItem new_token;
+            StackItem new_state;
+
+            new_token.token.word = "WHAT";
+            new_token.token.category = token_ptr->category;
+
+            new_state.s_int = to_state;
+
+            dynarray_push(stack, new_token);
+            dynarray_push(stack, new_state);
+
+            //printf("STACK: %d\n", new_state.s_int);
+
+            token_ptr++;
+
+            printf("Shift-> %d\n", to_state);
+        }
+        else if(tb.table_action[top_state.s_int][word_category_table][0] == 1){
+            printf("Accept");
+            break;
+        }
+        else{
+            printf("Error");
+            break;
+        }
+
+        //printf("%s", token_ptr->word);
+    } while(true);
 }
 
 bool int_equal(void* a, void* b) {
@@ -724,7 +844,7 @@ int main() {
         int nt = non_terminals[i];
         dynarray_push(G.NT, nt);
     }
-
+ 
     print_grammar(G);
 
     Subset* first = generate_first(G);
@@ -785,26 +905,47 @@ int main() {
         print_item(g[i]);
     }
     
-    printf("Moment of Truth\n");
+    //printf("Moment of Truth\n");
     TableMaterial table_material = c_collection(G, first);
-    CC_Item* CC = table_material.CC;
-    LRTransition* trans = table_material.goto_transitions;
+    //CC_Item* CC = table_material.CC;
+    //LRTransition* trans = table_material.goto_transitions;
 
-    for(int i = 0;i<dynarray_length(CC);i++){
-        printf("---\n");
-        for(int j = 0;j<dynarray_length(CC[i].cc);j++){
-            print_item(CC[i].cc[j]);
-        }
-        printf("---\n");
-    }
+    //for(int i = 0;i<dynarray_length(CC);i++){
+        //printf("---\n");
+        //for(int j = 0;j<dynarray_length(CC[i].cc);j++){
+            //print_item(CC[i].cc[j]);
+        //}
+        //printf("---\n");
+    //}
 
-    for(int i = 0;i<dynarray_length(trans);i++){
-        printf("---\n");
-        print_transition(trans[i]);
-    }
+    //for(int i = 0;i<dynarray_length(trans);i++){
+        ///printf("---\n");
+        //print_transition(trans[i]);
+    //}
 
     TableMapping tables_info = create_tables(G, table_material);
     print_tables(&tables_info);
+
+    Token* scanner_out = dynarray_create(Token);
+    Token lpar;
+    lpar.word = "(";
+    lpar.category = 5;
+    Token rpar;
+    rpar.word = ")";
+    rpar.category = 6;
+    Token end_of_file;
+    end_of_file.word = "\0";
+    end_of_file.category = 0;
+
+    dynarray_push(scanner_out, lpar);
+    dynarray_push(scanner_out, lpar);
+    dynarray_push(scanner_out, rpar);
+    dynarray_push(scanner_out, lpar);
+    dynarray_push(scanner_out, rpar);
+    dynarray_push(scanner_out, rpar);
+    dynarray_push(scanner_out, end_of_file);
+
+    parser_skeleton(G, tables_info, scanner_out, 0);
 
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 

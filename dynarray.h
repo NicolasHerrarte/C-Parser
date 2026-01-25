@@ -43,6 +43,7 @@ void _dynarray_pop(void *arr, void *dest);
 #define dynarray_push(arr, x) arr = _dynarray_push(arr, &x)
 #define dynarray_pushleft(arr, x) arr = _dynarray_pushleft(arr, &x)
 #define dynarray_replace(arr, x, ind) _dynarray_replace(arr, &x, int index)
+#define dynarray_get_last(arr) arr[dynarray_length(arr)-1]
 
 #define dynarray_push_rval(arr, x) \
     do { \
