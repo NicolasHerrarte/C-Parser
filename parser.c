@@ -78,6 +78,11 @@ typedef struct TableMapping{
     int* symbols_mapping;
 } TableMapping;
 
+typedef struct Pair{
+    char* key;
+    int value;
+} Pair;
+
 void print_transition(LRTransition t){
     printf("State: ");
     printf("%d ", t.state_from);
@@ -713,6 +718,26 @@ void print_stack(StackItem* stack) {
     printf("]\n");
 }
 
+Hash dictionary_from_mapping(Pair* mapping, int map_size){
+    Hash dict_map = dynadict_create(512, int);
+    for(int i=0;i<map_size;i++){
+        char* key = mapping[i].key;
+        int value = mapping[i].value;
+        dynadict_add(dict_map, key, value);
+    }
+
+    return dict_map;
+}
+
+char** storage_table_from_mapping(Pair* mapping, int map_size){
+    char** inverse_map = malloc(map_size * sizeof(char*));
+    for(int i=0;i<map_size;i++){
+        inverse_map[i] = mapping[i].key;
+    }
+
+    return inverse_map;
+}
+
 void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters){
     StackItem* stack = dynarray_create_prealloc(StackItem,100);
     StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
@@ -1014,6 +1039,23 @@ int main() {
     // 7. Cleanup (Optional but good practice)
     // You'd want a _hash_destroy function here eventually!
     printf("\n--- [TEST] Verification Complete ---\n");
+
+    Pair mapping[] = {
+        {"End", 0},
+        {"Epsilon", 1},
+        {"Goal", 2},
+        {"List", 3},
+        {"Pair", 4},
+        {"(", 5},
+        {")", 6}
+    };
+
+    Hash dict_map = dictionary_from_mapping(mapping, 7);
+    char** value_map = storage_table_from_mapping(mapping, 7);
+
+    char* k = "Goal";
+    printf("%d\n", *((int*) dynadict_get(dict_map, k)));
+    printf("%s\n", value_map[2]);
 
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 

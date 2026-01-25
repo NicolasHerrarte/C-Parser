@@ -183,8 +183,5 @@ bool string_equal(void* ptr1, void* ptr2){
     char* str1 = *((char**) ptr1);
     char* str2 = *((char**) ptr2);
 
-    printf("%s\n", str1);
-    printf("%s\n", str2);
-
     return strcmp(str1, str2) == 0;
 }
