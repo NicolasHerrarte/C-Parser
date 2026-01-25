@@ -939,13 +939,81 @@ int main() {
 
     dynarray_push(scanner_out, lpar);
     dynarray_push(scanner_out, lpar);
-    dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, lpar);
+    dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, end_of_file);
 
     parser_skeleton(G, tables_info, scanner_out, 0);
+
+    Hash my_dict = dynadict_create(4, int);
+    printf("\n--- [TEST] Dictionary Created (Capacity: 4) ---\n");
+
+    // 2. Define Test Data
+    char* k1 = "variable_x";
+    char* k2 = "variable_y";
+    char* k3 = "variable_z";
+    char* kn = "not_there";
+    int v1 = 10, v2 = 20, v3 = 30;
+
+    // 3. Test Insertion
+    printf("\n--- Phase 1: Adding Items ---\n");
+    dynadict_add(my_dict, k1, v1);
+    printf("Added '%s' (Value: %d). Count: %lu\n", k1, v1, (unsigned long)my_dict.count);
+    
+    dynadict_add(my_dict, k2, v2);
+    printf("Added '%s' (Value: %d). Count: %lu\n", k2, v2, (unsigned long)my_dict.count);
+
+    // 4. Test Key Presence
+    printf("\n--- Phase 2: Checking Existence ---\n");
+    if (dynadict_key_in(my_dict, k1)) printf("SUCCESS: '%s' found.\n", k1);
+    else printf("FAILURE: '%s' missing.\n", k1);
+
+    if (dynadict_key_in(my_dict, kn)) printf("FAILURE: Found a ghost key!\n");
+    else printf("SUCCESS: 'not_there' correctly not found.\n");
+
+    int* list = (int*) hash_to_list(my_dict);
+    
+    // Note: In a dense array with holes, you might need to be careful.
+    // If your _hash_to_list doesn't pack the array, 
+    // we iterate up to the count or the current capacity.
+    for(int i = 0; i < (int)my_dict.count; i++) {
+        printf("List Item [%d]: %d\n", i, list[i]);
+    }
+
+    // 5. Test Retrieval
+    printf("\n--- Phase 3: Getting Values ---\n");
+    int* ptr_y = (int*)dynadict_get(my_dict, k2);
+    if (ptr_y) printf("Retrieved '%s' -> Value: %d\n", k2, *ptr_y);
+    else printf("FAILURE: Could not get value for '%s'\n", k2);
+
+    // 6. Test Deletion & Memory Reuse (The "Hole" Logic)
+    printf("\n--- Phase 4: Deletion & Hole Management ---\n");
+    printf("Initial holes count: %lu\n", (unsigned long)dynarray_length(my_dict.holes));
+    
+    dynadict_remove(my_dict, k1);
+    printf("Removed '%s'. Count: %lu\n", k1, (unsigned long)my_dict.count);
+    printf("Holes count after removal: %lu\n", (unsigned long)dynarray_length(my_dict.holes));
+
+    // Adding a new item to trigger the 'hole' reuse code path
+    char* k4 = "new_var";
+    int v4 = 99;
+    printf("Adding '%s' (Value: %d)...\n", k4, v4);
+    dynadict_add(my_dict, k4, v4);
+    
+    printf("Holes count after reuse: %lu\n", (unsigned long)dynarray_length(my_dict.holes));
+    printf("Final Dictionary Count: %lu\n", (unsigned long)my_dict.count);
+
+    list = (int*)hash_to_list(my_dict);
+    printf("--- Final List State ---\n");
+    for(int i = 0; i < (int)my_dict.count; i++) {
+        printf("List Item [%d]: %d\n", i, list[i]);
+    }
+
+    // 7. Cleanup (Optional but good practice)
+    // You'd want a _hash_destroy function here eventually!
+    printf("\n--- [TEST] Verification Complete ---\n");
 
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 

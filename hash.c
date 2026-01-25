@@ -8,12 +8,16 @@
 #include "hash.h"
 
 
-Hash _hash_create(int node_amount, size_t stride, void* ptr_func)
+Hash _hash_create(int node_amount, size_t stride, size_t key_stride, void* ptr_func, bool uses_key_storage)
 {
     Hash hash;
     hash.table = calloc(node_amount, sizeof(Node*));
     hash.obj_storage = _dynarray_create(DYNARRAY_DEFAULT_CAP, stride);
+    if(uses_key_storage){
+        hash.key_storage = _dynarray_create(DYNARRAY_DEFAULT_CAP, key_stride);
+    }
     hash.stride = stride;
+    hash.key_stride = key_stride;
     hash.f_ptr = ptr_func;
     hash.capacity = node_amount;
     hash.holes = dynarray_create(int);
@@ -23,7 +27,7 @@ Hash _hash_create(int node_amount, size_t stride, void* ptr_func)
 }
 
 
-bool _hash_in(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), int action){
+bool _hash_in(Hash *hash, void *xptr, void *str_ptr, bool (*f_equality_ptr)(void*, void*), int action, bool uses_key_storage){
     uint64_t hash_id = hash->f_ptr(xptr);
 
     int bucket_id = hash_id%(hash->capacity);
@@ -34,8 +38,15 @@ bool _hash_in(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), int 
         Node* prev = NULL;
 
         while(tmp != NULL){
-            uint64_t curr_hash_id = hash->f_ptr((char*) hash->obj_storage + tmp->storage_index * hash->stride);
-            if(hash_id == curr_hash_id && f_equality_ptr(xptr, (char*) hash->obj_storage + tmp->storage_index * hash->stride)){
+            uint64_t curr_hash_id = tmp->hash_index;
+            bool bucket_pass;
+            if(uses_key_storage){
+                bucket_pass = f_equality_ptr(xptr, (char*) hash->key_storage + tmp->storage_index * hash->key_stride);
+            }
+            else{
+                bucket_pass = f_equality_ptr(xptr, (char*) hash->obj_storage + tmp->storage_index * hash->stride);
+            }
+            if(hash_id == curr_hash_id && bucket_pass){
                 
                 if(action == -1){
                     if(prev != NULL){
@@ -63,13 +74,20 @@ bool _hash_in(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), int 
         int placement_index = dynarray_length(hash->obj_storage);
         if(dynarray_length(hash->holes)>0){
             dynarray_pop(hash->holes, &placement_index);
-            _dynarray_replace(hash->obj_storage, xptr, placement_index);
+            _dynarray_replace(hash->obj_storage, str_ptr, placement_index);
+            if(uses_key_storage){
+                _dynarray_replace(hash->key_storage, xptr, placement_index);
+            }
         }
         else{
-            hash->obj_storage = _dynarray_push(hash->obj_storage, xptr);
+            hash->obj_storage = _dynarray_push(hash->obj_storage, str_ptr);
+            if(uses_key_storage){
+                hash->key_storage = _dynarray_push(hash->key_storage, xptr);
+            }
         }
         
         node->storage_index = placement_index;
+        node->hash_index = hash_id;
 
         if(slot != NULL){
             node->next = slot;
@@ -83,7 +101,7 @@ bool _hash_in(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), int 
     return false;
 }
 
-void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*)){
+void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), bool uses_key_storage){
     uint64_t hash_id = hash->f_ptr(xptr);
 
     int bucket_id = hash_id%(hash->capacity);
@@ -94,8 +112,16 @@ void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*)){
         Node* prev = NULL;
 
         while(tmp != NULL){
-            uint64_t curr_hash_id = hash->f_ptr((char*) hash->obj_storage + tmp->storage_index * hash->stride);
-            if(hash_id == curr_hash_id && f_equality_ptr(xptr, (char*) hash->obj_storage + tmp->storage_index * hash->stride)){
+            uint64_t curr_hash_id = tmp->hash_index;
+
+            bool bucket_pass;
+            if(uses_key_storage){
+                bucket_pass = f_equality_ptr(xptr, (char*) hash->key_storage + tmp->storage_index * hash->key_stride);
+            }
+            else{
+                bucket_pass = f_equality_ptr(xptr, (char*) hash->obj_storage + tmp->storage_index * hash->stride);
+            }
+            if(hash_id == curr_hash_id && bucket_pass){
                 return (void*)((char*) hash->obj_storage + tmp->storage_index * hash->stride);            
             }
             prev = tmp;
@@ -130,7 +156,7 @@ uint64_t _hash_int(void *xptr) {
     return x;
 }
 
-uint64_t hash_combine( uint64_t lhs, uint64_t rhs ) {
+uint64_t hash_combine(uint64_t lhs, uint64_t rhs ) {
     if (sizeof(uint64_t) >= 8) {
         lhs ^= rhs + 0x517cc1b727220a95 + (lhs << 6) + (lhs >> 2);
     } 
@@ -138,4 +164,27 @@ uint64_t hash_combine( uint64_t lhs, uint64_t rhs ) {
         lhs ^= rhs + 0x9e3779b9 + (lhs << 6) + (lhs >> 2);
     }
     return lhs;
+}
+
+uint32_t _djb33_hash(void *xptr)
+{
+    const char* s = *((char**) xptr);
+    uint32_t h = 5381;
+    int c;
+
+    while (c = *s++) {
+        /* h = 33 * h ^ s[i]; */
+        h = ((h << 5) + h) ^ c; 
+    }
+    return h;
+}
+
+bool string_equal(void* ptr1, void* ptr2){
+    char* str1 = *((char**) ptr1);
+    char* str2 = *((char**) ptr2);
+
+    printf("%s\n", str1);
+    printf("%s\n", str2);
+
+    return strcmp(str1, str2) == 0;
 }
