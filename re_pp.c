@@ -33,6 +33,9 @@ char* regex_prep(char* raw_reg){
         if(raw_reg[i] == '/'){
             dynarray_push(expanded_reg, raw_reg[i]);
             dynarray_push(expanded_reg, raw_reg[i+1]);
+            if(should_expand == true && ((i+2)<raw_reg_len && raw_reg[i+2] != ']')){
+                dynarray_push(expanded_reg, or_sign);
+            }
             i++;
             continue;
         }

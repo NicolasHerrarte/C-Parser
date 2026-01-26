@@ -45,6 +45,7 @@ typedef struct Fragment{
 void print_transition(Transition t);
 void FA_print(FA fa);
 void states_print(int* states);
+void print_token_seq(Token* tokens);
 
 int FA_initialize(FA *fa);
 int FA_next_state(FA *fa);

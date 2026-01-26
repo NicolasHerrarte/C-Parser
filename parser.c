@@ -8,7 +8,7 @@
 #include "subset.h"
 #include "hash.h"
 #include "scanner.h"
-
+#include "re_pp.h"
 
 enum {
     END,
@@ -1059,8 +1059,12 @@ int main() {
                            "|    -> ( );"
     ;
 
-    char* re_rules = "[a-zA-Z]*$02|(->)$03|;$04|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    int ignore_categories[] = {1};
+
+    char* re_rules = "[a-zA-Z/(/)]*$02|/|$03|(->)$04|;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     FA rules_regex = MakeFA(re_rules, true);
+    Token* tokens = scanner_loop_string(rules_regex, prod_rules_src, ignore_categories, 1);
+    print_token_seq(tokens);
               
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 

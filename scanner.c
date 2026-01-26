@@ -64,6 +64,12 @@ void states_print(int* states){
     printf("]\n");
 }
 
+void print_token_seq(Token* tokens){
+    for(int i = 0;i<dynarray_length(tokens);i++){
+        printf("(%s, %d)\n", tokens[i].word, tokens[i].category);
+    }
+}
+
 int FA_initialize(FA *fa){
     fa->states = dynarray_create(int);
     fa->transitions = dynarray_create(Transition);
