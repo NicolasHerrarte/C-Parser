@@ -64,7 +64,8 @@ int closure(Fragment fragment, Fragment *left_fragment, Fragment *right_fragment
 int fin_type(Fragment fragment, Fragment *left_fragment, Fragment *right_fragment, int *priority, bool *final_split, char* state_identifier, char next_char, int depth, int i);
 int parenthesis(Fragment fragment, Fragment *left_fragment, bool *final_split, bool split_found, int i);
 
-Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state, bool recursion);
+void print_safe_char(char c);
+Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state, bool recursion, bool debug);
 
 Subset e_closure(FA nfa, Subset states_closure);
 Subset delta(FA nfa, Subset q, char c);
@@ -73,6 +74,8 @@ int* NFA_transition_function(FA nfa, int state, char c);
 int DFA_transition_function(FA dfa, int state, char c);
 
 FA NtoDFA(FA nfa);
-Token* scanner_loop_file(FA dfa, char* directory);
-Token* scanner_loop_string(FA dfa, char* src);
+Token* scanner_loop_file(FA dfa, char* directory, int* ignore_cats, int amount_ignore);
+Token* scanner_loop_string(FA dfa, char* src, int* ignore_cats, int amount_ignore);
+
+FA MakeFA(char *src, bool debug);
 

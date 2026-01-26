@@ -7,11 +7,12 @@
 #include "dynarray.h"
 #include "subset.h"
 #include "hash.h"
+#include "scanner.h"
 
 
 enum {
     END,
-    EPSILON,
+    EPSILON_P,
     GOAL,
     LIST,
     PAIR, 
@@ -51,12 +52,6 @@ typedef struct LRTransition{
     int trans_symbol;
 } LRTransition;
 
-// Scanner Output
-typedef struct Token{
-    char* word;
-    int category;
-} Token;
-
 typedef union StackItem{
     Token token;
     int s_int;
@@ -83,7 +78,7 @@ typedef struct Pair{
     int value;
 } Pair;
 
-void print_transition(LRTransition t){
+void print_transitionLR(LRTransition t){
     printf("State: ");
     printf("%d ", t.state_from);
     printf("- ");
@@ -308,27 +303,27 @@ Subset* generate_first(Grammar G){
             bool contains_empty = false;
 
             Subset rhs = SS_deep_copy(first[B[0]]);
-            SS_remove(&rhs, EPSILON);
+            SS_remove(&rhs, EPSILON_P);
 
             int k = 0;
             for(int j = 0;j<prod_beta_size;j++){
-                if(B[j] == EPSILON){
+                if(B[j] == EPSILON_P){
                     contains_empty = true;
                     break;
                 }
             }
 
             if(!contains_empty){
-                while(SS_in(first[B[k]], EPSILON) && i<prod_beta_size-1){
+                while(SS_in(first[B[k]], EPSILON_P) && i<prod_beta_size-1){
                     Subset temp_rhs = SS_deep_copy(first[B[k+1]]);
-                    SS_remove(&temp_rhs, EPSILON);
+                    SS_remove(&temp_rhs, EPSILON_P);
                     SS_union(rhs, temp_rhs);
                     SS_destroy(&temp_rhs);
                     k++;
                 }   
             }
-            if(k==prod_beta_size-1 && SS_in(first[B[k]], EPSILON)){
-                SS_add(&rhs, EPSILON);
+            if(k==prod_beta_size-1 && SS_in(first[B[k]], EPSILON_P)){
+                SS_add(&rhs, EPSILON_P);
             }
             Subset first_A_tmp = SS_deep_copy(first[A]);
             SS_union(first[A], rhs);
@@ -345,7 +340,7 @@ Subset* generate_first(Grammar G){
     return first;
 }
 
-Item* closure(Grammar G, Item* s_raw, Subset* first){
+Item* item_closure(Grammar G, Item* s_raw, Subset* first){
     bool change = false;
     Item* s = item_list_copy(s_raw);
     int counter = 0;
@@ -367,7 +362,7 @@ Item* closure(Grammar G, Item* s_raw, Subset* first){
                     bool found_delta_first = false;
                     for(int delta_index=curr_k+1;delta_index<beta_length;delta_index++){
                         int delta = (*s[i].beta)[delta_index];
-                        if(delta == EPSILON){
+                        if(delta == EPSILON_P){
                             continue;
                         }
                         found_delta_first = true;
@@ -437,7 +432,7 @@ Item* goto_table(Grammar G, Item* s, Subset* first, int x){
         }
     }
 
-    return closure(G, moved, first);
+    return item_closure(G, moved, first);
 }
 
 TableMaterial c_collection(Grammar G, Subset* first){
@@ -451,7 +446,7 @@ TableMaterial c_collection(Grammar G, Subset* first){
     dynarray_push(s, start_item);
 
     CC_Item cc0;
-    cc0.cc = closure(G, s, first);
+    cc0.cc = item_closure(G, s, first);
     cc0.marked = false;
 
     CC_Item* CC = dynarray_create(CC_Item);
@@ -836,7 +831,7 @@ int main() {
 
     // Make a way for this initialization to be made only with rules and string not this bs
     Grammar G = create_grammar();
-    int terminals[] = {LEFT_PAR, RIGHT_PAR, EPSILON, END};
+    int terminals[] = {LEFT_PAR, RIGHT_PAR, EPSILON_P, END};
     int non_terminals[] = {GOAL, LIST, PAIR};
 
     G.S = GOAL;
@@ -916,7 +911,7 @@ int main() {
 
     printf("What\n");
     printf("%d\n", dynarray_length(s));
-    Item* c = closure(G, s, first);
+    Item* c = item_closure(G, s, first);
 
     printf("--- closure ---\n");
     for(int i = 0;i<dynarray_length(c);i++){
@@ -1041,8 +1036,8 @@ int main() {
     printf("\n--- [TEST] Verification Complete ---\n");
 
     Pair mapping[] = {
-        {"End", 0},
-        {"Epsilon", 1},
+        {"End", END},
+        {"Epsilon", EPSILON_P},
         {"Goal", 2},
         {"List", 3},
         {"Pair", 4},
@@ -1057,6 +1052,16 @@ int main() {
     printf("%d\n", *((int*) dynadict_get(dict_map, k)));
     printf("%s\n", value_map[2]);
 
+    char* prod_rules_src = "Goal -> List;"
+                           "List -> List Pair;"
+                           "|    -> Pair;"
+                           "Pair -> ( Pair );"
+                           "|    -> ( );"
+    ;
+
+    char* re_rules = "[a-zA-Z]*$02|(->)$03|;$04|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    FA rules_regex = MakeFA(re_rules, true);
+              
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 
     //printf("%llu", hash_item_list(c));
