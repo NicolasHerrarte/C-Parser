@@ -4,6 +4,7 @@
 #define int_b_table_to_list(b_table, table_size) _b_table_to_list(b_table, table_size, sizeof(int))
 #define char_b_table_to_list(b_table) _b_table_to_list(b_table, 256, sizeof(unsigned char))
 #define SS_union(x, y) _SS_union(&x, y)
+#define SS_inv(x) _SS_inv(&x)
 
 typedef struct Subset{
     bool* table;
@@ -18,7 +19,8 @@ void SS_destroy(Subset* subset);
 Subset SS_deep_copy(Subset subset);
 void SS_add(Subset* subset, int new_state);
 void SS_remove(Subset* subset, int rem_state);
-Subset _SS_union(Subset* subset1, Subset subset2);
+void _SS_union(Subset* subset1, Subset subset2);
+void _SS_inv(Subset* subset);
 bool SS_equal(Subset subset1, Subset subset2);
 bool SS_in(Subset subset1, int state);
 bool SS_list_in(Subset* subset_list, Subset elem);

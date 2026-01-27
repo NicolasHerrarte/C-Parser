@@ -78,7 +78,7 @@ void SS_remove(Subset* subset, int rem_state){
     }  
 }
 
-Subset _SS_union(Subset* subset1, Subset subset2){
+void _SS_union(Subset* subset1, Subset subset2){
     assert(subset1->capacity == subset2.capacity);
     for(int i = 0;i<subset1->capacity;i++){
         if(subset1->table[i] == false && subset2.table[i] == true){
@@ -86,6 +86,14 @@ Subset _SS_union(Subset* subset1, Subset subset2){
             subset1->table[i] = true;
         }
     }
+}
+
+void _SS_inv(Subset* subset){
+    for(int i = 0;i<subset->capacity;i++){
+        subset->table[i] = !subset->table[i];
+    }
+
+    subset->count = subset->capacity - subset->count;
 }
 
 bool SS_equal(Subset subset1, Subset subset2){

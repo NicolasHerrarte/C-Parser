@@ -221,41 +221,111 @@ bool hash_CC_item_equal(void* a_ptr, void* b_ptr){
     return(hash_item_list_equal(&item_a->cc, &item_b->cc));
 }
 
-void print_item(Item item){
-    printf("[ %d -> ", item.alpha);
-    for(int i = 0;i<dynarray_length(*item.beta);i++){
-        if(i != -1 && i == item.k){
-            printf("*");
-        }
-        printf("%d ", (*item.beta)[i]);
+
+int get_rhs_width(Item item, char** index_mapping) {
+    int width = 0;
+    int len = dynarray_length(*item.beta);
+    for (int i = 0; i < len; i++) {
+        width += strlen(index_mapping[(*item.beta)[i]]) + 1; // +1 for the space
     }
-    printf(", %d ]\n", item.lookahead);
+    // Add 1 for the '*' character
+    return width + 1; 
 }
 
-void print_production(Production prod){
-    printf("[ %d -> ", prod.alpha);
+void print_item(Item item, char** index_mapping, int max_alpha, int max_rhs) {
+    // 1. Align the '->' based on the largest LHS found in the list
+    printf("[ %-*s -> ", max_alpha, index_mapping[item.alpha]);
+
+    // 2. Print RHS and track characters for comma alignment
+    int current_rhs_width = 0;
+    int len = dynarray_length(*item.beta);
+    for (int i = 0; i < len; i++) {
+        if (i == item.k) {
+            current_rhs_width += printf("*");
+        }
+        current_rhs_width += printf("%s ", index_mapping[(*item.beta)[i]]);
+    }
+    if (item.k == len) {
+        current_rhs_width += printf("*");
+    }
+
+    // 3. Pad the RHS so the ',' stays aligned
+    int padding = max_rhs - current_rhs_width;
+    if (padding > 0) printf("%*s", padding, "");
+
+    // 4. Print lookahead
+    printf(", %s ]\n", index_mapping[item.lookahead]);
+}
+
+void print_item_list(Item* c, char** val_table, char* title) {
+    int max_alpha = 0;
+    int max_rhs = 0;
+    int max_lookahead = 0;
+    int count = dynarray_length(c);
+
+    // 1. Pre-scan for all maximum widths
+    for (int i = 0; i < count; i++) {
+        // LHS
+        int alpha_len = strlen(val_table[c[i].alpha]);
+        if (alpha_len > max_alpha) max_alpha = alpha_len;
+
+        // RHS
+        int rhs_len = get_rhs_width(c[i], val_table);
+        if (rhs_len > max_rhs) max_rhs = rhs_len;
+
+        // Lookahead
+        int la_len = strlen(val_table[c[i].lookahead]);
+        if (la_len > max_lookahead) max_lookahead = la_len;
+    }
+
+    // 2. Calculate Total Line Width
+    // [ (2) + max_alpha + " -> " (4) + max_rhs + ", " (2) + max_lookahead + " ]" (2)
+    int total_width = 2 + max_alpha + 4 + max_rhs + 2 + max_lookahead + 2;
+
+    // 3. Print the Dynamic Title Bar
+    int title_len = strlen(title);
+    int dash_count = (total_width - title_len - 2) / 2; // -2 for spaces around title
+
+    for(int i = 0; i < dash_count; i++) printf("-");
+    printf(" %s ", title);
+    // Print extra dash if total_width is odd
+    for(int i = 0; i < (total_width - title_len - 2 - dash_count); i++) printf("-");
+    printf("\n");
+
+    // 4. Print Items
+    for (int i = 0; i < count; i++) {
+        print_item(c[i], val_table, max_alpha, max_rhs);
+    }
+    
+    // 5. Bottom border
+    for(int i = 0; i < total_width; i++) printf("-");
+    printf("\n");
+}
+
+void print_production(Production prod, char** index_mapping){
+    printf("[ %s -> ", index_mapping[prod.alpha]);
     for(int i = 0;i<dynarray_length(prod.beta);i++){
-        printf("%d ", prod.beta[i]);
+        printf("%s ", index_mapping[prod.beta[i]]);
     }
     printf("]\n", prod.alpha);
 }
 
-void print_grammar(Grammar G){
-    printf("Goal: %d\n", G.S);
+void print_grammar(Grammar G, char** index_mapping){
+    printf("Goal: %s\n", index_mapping[G.S]);
     printf("Terminals\n [");
     for(int i = 0;i<dynarray_length(G.T);i++){
-        printf("%d, ", G.T[i]);
+        printf("%s, ", index_mapping[G.T[i]]);
     }
     printf("]\n");
     printf("Non Terminals\n [");
     for(int i = 0;i<dynarray_length(G.NT);i++){
-        printf("%d, ", G.NT[i]);
+        printf("%s, ", index_mapping[G.NT[i]]);
     }
     printf("]\n");
     printf("Production Rules\n");
     for(int i = 0;i<dynarray_length(G.productions);i++){
         printf("%d | ", i);
-        print_production(G.productions[i]);
+        print_production(G.productions[i], index_mapping);
     }
 }
 
@@ -338,6 +408,34 @@ Subset* generate_first(Grammar G){
     }
     while(changed == true);
     return first;
+}
+
+void print_first_sets(Grammar G, Subset* first, char** val_table) {
+    printf("\n--- FIRST SETS ---\n");
+    
+    // Only print for Non-Terminals (Terminals are trivial)
+    for (int i = 0; i < dynarray_length(G.NT); i++) {
+        int nt_id = G.NT[i];
+        printf("FIRST(%s) = { ", val_table[nt_id]);
+
+        bool first_element = true;
+        // Check every possible symbol ID to see if it's in the subset
+        int total_symbols = dynarray_length(G.T) + dynarray_length(G.NT);
+        
+        for (int s = 0; s < total_symbols; s++) {
+            if (SS_in(first[nt_id], s)) {
+                if (!first_element) printf(", ");
+                
+                // Handle Epsilon specifically if it's a special ID
+                if (s == EPSILON_P) printf("ε");
+                else printf("%s", val_table[s]);
+                
+                first_element = false;
+            }
+        }
+        printf(" }\n");
+    }
+    printf("------------------\n");
 }
 
 Item* item_closure(Grammar G, Item* s_raw, Subset* first){
@@ -528,6 +626,28 @@ TableMaterial c_collection(Grammar G, Subset* first){
     return fout;
 }
 
+void print_canonical_collection(CC_Item* CC, char** val_table) {
+    int count = dynarray_length(CC);
+    
+    printf("\n=== CANONICAL COLLECTION ===\n");
+    
+    for (int i = 0; i < count; i++) {
+        // Create a dynamic title for this specific state
+        char title_buffer[32];
+        sprintf(title_buffer, "State %d", CC[i].state);
+        
+        // Reuse the dynamic print function you already have
+        // CC[i].cc is the Item* list (the closure) for this state
+        print_item_list(CC[i].cc, val_table, title_buffer);
+        
+        // Add a small gap between states for readability
+        printf("\n");
+    }
+    
+    printf("Total States: %d\n", count);
+    printf("============================\n");
+}
+
 void print_tables(TableMapping* tm) {
     if (tm == NULL) return;
 
@@ -605,7 +725,7 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     int end_rval = END;
     dynarray_push(action_mapping, end_rval);
 
-    printf("--- Mappings ---\n");
+    //printf("--- Mappings ---\n");
 
     for(int i=0;i<dynarray_length(tb.goto_transitions);i++){
         int curr_symbol = tb.goto_transitions[i].trans_symbol;
@@ -613,22 +733,22 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
             if(SS_in(fast_terminal,curr_symbol)){
                 symbols_mapping[curr_symbol] = t_count;
                 dynarray_push(action_mapping, curr_symbol);
-                printf("Terminal[%d] = %d\n", curr_symbol, t_count);
+                //printf("Terminal[%d] = %d\n", curr_symbol, t_count);
                 t_count ++;
             }
             else{
                 symbols_mapping[curr_symbol] = nt_count;
                 dynarray_push(goto_mapping, curr_symbol);
-                printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
+                //printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
                 nt_count ++;
             }
             SS_add(&counted, curr_symbol);
         }
     }
 
-    printf("--- Counts ---\n");
-    printf("T: %d, NT: %d\n", t_count, nt_count);
-    printf("--- Actions ---\n");
+    //printf("--- Counts ---\n");
+    //printf("T: %d, NT: %d\n", t_count, nt_count);
+    //printf("--- Actions ---\n");
 
     int*** table_action = malloc(states_count * sizeof(int**));
     for(int i=0;i<dynarray_length(tb.CC);i++){
@@ -647,12 +767,12 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     for(int i=0;i<dynarray_length(tb.goto_transitions);i++){
         LRTransition curr_trans = tb.goto_transitions[i];
         if(SS_in(fast_terminal, curr_trans.trans_symbol)){
-            printf("Action[i->%d, c->%d] = shift j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
+            //printf("Action[i->%d, c->%d] = shift j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
             table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][0] = 2;
             table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][1] = curr_trans.state_to;
         }
         else{
-            printf("Goto[i->%d, n->%d] = j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
+            //printf("Goto[i->%d, n->%d] = j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
             table_goto[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]] = curr_trans.state_to;
         }
     }
@@ -663,7 +783,7 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
             int* curr_beta = *curr_item.beta;
             if(curr_item.k == dynarray_length(curr_beta)){
                 if(curr_item.alpha == GOAL){
-                    printf("Action[i->%d, a->%d] = acc\n", i, curr_item.lookahead);
+                    //printf("Action[i->%d, a->%d] = acc\n", i, curr_item.lookahead);
                     table_action[i][symbols_mapping[curr_item.lookahead]][0] = 1;
                 }
                 else{
@@ -674,7 +794,7 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
                             break;
                         }
                     }
-                    printf("Action[i->%d, a->%d] = reduce p->%d\n", i, curr_item.lookahead, p_rule+1);
+                    //printf("Action[i->%d, a->%d] = reduce p->%d\n", i, curr_item.lookahead, p_rule+1);
                     table_action[i][symbols_mapping[curr_item.lookahead]][0] = 3;
                     table_action[i][symbols_mapping[curr_item.lookahead]][1] = p_rule;
                 }
@@ -695,14 +815,15 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     return t_mapping;
 }
 
-void print_stack(StackItem* stack) {
+void print_stack(StackItem* stack, char** index_mapping) {
     int len = dynarray_length(stack);
+    printf("--- Stack ---\n");
     printf("[ ");
     
     for (int i = 0; i < len; i++) {
         // Even index (0, 2, 4...) -> It's a Symbol/Token
         if (i % 2 == 0) {
-            printf("%d ", stack[i].token.category);
+            printf("%s ", index_mapping[stack[i].token.category]);
         } 
         // Odd index (1, 3, 5...) -> It's a State (int)
         else {
@@ -733,7 +854,7 @@ char** storage_table_from_mapping(Pair* mapping, int map_size){
     return inverse_map;
 }
 
-void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters){
+void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters, char** index_mapping){
     StackItem* stack = dynarray_create_prealloc(StackItem,100);
     StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
 
@@ -753,9 +874,10 @@ void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_par
     do{
         StackItem top_state = dynarray_get_last(stack);
 
-        print_stack(stack);
-        printf("Word %d\n", token_ptr->category);
-        printf("State %d\n", top_state.s_int);
+        printf("--- Iteration ---\n");
+        printf("Current Word: %s\n", index_mapping[token_ptr->category]);
+        printf("Current State: %d\n", top_state.s_int);
+        print_stack(stack, index_mapping);
         //printf("Stack Top-> %d\n", top_state.s_int);
         //printf("Current Word-> %s\n", token_ptr->word);
 
@@ -787,7 +909,7 @@ void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_par
             dynarray_push(stack, new_state);
            
             
-            printf("Reduce-> %d\n", prod_rule+1);
+            printf("Reduce -> %d\n", prod_rule+1);
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 2){
             int to_state = tb.table_action[top_state.s_int][word_category_table][1];
@@ -807,7 +929,7 @@ void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_par
 
             token_ptr++;
 
-            printf("Shift-> %d\n", to_state);
+            printf("Shift -> %d\n", to_state);
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 1){
             printf("Accept");
@@ -826,8 +948,90 @@ bool int_equal(void* a, void* b) {
     return *(int*)a == *(int*)b;
 }
 
+Grammar build_grammar(char * lexing_rules, Hash dict_mapping, int symbols_amount){
+    int ignore_categories[] = {1};
+
+    char* re_rules = "([a-zA-Z/(/);])*$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    FA rules_regex = MakeFA(re_rules, true);
+    Token* token = scanner_loop_string(rules_regex, lexing_rules, ignore_categories, 1);
+    print_token_seq(token);
+
+    Grammar G = create_grammar();
+    Subset non_terminals_ss = SS_initialize_empty(symbols_amount);
+
+    int state = 0;
+    int head_word_class;
+    int* beta_memory = dynarray_create(int);
+    bool first_creation = true;
+    while(token->category != 0){
+        if(state == 0 && token->category == 2){
+            int* pointer_get = dynadict_get(dict_mapping,token->word);
+            if(pointer_get == NULL){
+                printf("Rules Synthax Error\n");
+            }
+            assert(pointer_get != NULL);
+            head_word_class = *pointer_get;
+            SS_add(&non_terminals_ss, head_word_class);
+            if(first_creation){
+                G.S = head_word_class;
+            }
+            first_creation = false;
+            state = 1;
+        }
+        else if(state == 0 && token->category == 3){
+            state = 1;
+        }
+        else if(state == 1 && token->category == 4){
+            state = 2;
+        }
+        else if(state == 2 && token->category == 2){
+            int* pointer_get = dynadict_get(dict_mapping,token->word);
+            if(pointer_get == NULL){
+                printf("Rules Synthax Error\n");
+            }
+            assert(pointer_get != NULL);
+            int b_word_class = *pointer_get;
+            dynarray_push(beta_memory, b_word_class);
+            state = 2;
+        }
+        else if(state == 2 && token->category == 5){
+            Production item = create_production(head_word_class, beta_memory, dynarray_length(beta_memory));
+            dynarray_push(G.productions, item);
+            beta_memory = dynarray_create(int);
+            state = 0;
+        }
+        else{
+            printf("Rules Synthax Error\n");
+            assert(false);
+        }
+
+        token ++;
+    }
+
+    Subset terminals_ss = SS_deep_copy(non_terminals_ss);
+    SS_inv(terminals_ss);
+    
+    G.NT = SS_to_list_indexes(non_terminals_ss);
+    G.T = SS_to_list_indexes(terminals_ss);
+
+    return G;
+}
+
 int main() {
     printf("Parser...\n");
+
+    Pair mapping[] = {
+        {"End", END},
+        {"Epsilon", EPSILON_P},
+        {"Goal", 2},
+        {"List", 3},
+        {"Pair", 4},
+        {"(", 5},
+        {")", 6}
+    };
+
+    Hash dict_map = dictionary_from_mapping(mapping, 7);
+    char** value_map = storage_table_from_mapping(mapping, 7);
 
     // Make a way for this initialization to be made only with rules and string not this bs
     Grammar G = create_grammar();
@@ -865,18 +1069,26 @@ int main() {
         dynarray_push(G.NT, nt);
     }
  
-    print_grammar(G);
+    print_grammar(G, value_map);
+
+    char* k = "Goal";
+    printf("%d\n", *((int*) dynadict_get(dict_map, k)));
+    printf("%s\n", value_map[2]);
+
+    char* prod_rules_src = "Goal /-> List /;"
+                           "List /-> List Pair /;"
+                           "/|   /-> Pair /;"
+                           "Pair /-> ( Pair ) /;"
+                           "/|   /-> ( ) /;"
+    ;
+
+    Grammar Gt = build_grammar(prod_rules_src, dict_map, 7);
+    print_grammar(Gt, value_map);
+    
 
     Subset* first = generate_first(G);
-    for(int i = 0;i<7;i++){
-        int* list = SS_to_list_indexes(first[i]);
-        printf("%d\n", i);
-        printf("---\n");
-        for(int j = 0;j<dynarray_length(list);j++){
-            printf("%d ", list[j]);
-        }
-        printf("\n\n");
-    }
+
+    print_first_sets(G, first, value_map);
     
     Item initial_item;
     initial_item.alpha = GOAL;
@@ -909,24 +1121,19 @@ int main() {
     dynarray_push(s, initial_item1);
     dynarray_push(s, initial_item2);
 
-    printf("What\n");
-    printf("%d\n", dynarray_length(s));
     Item* c = item_closure(G, s, first);
 
-    printf("--- closure ---\n");
-    for(int i = 0;i<dynarray_length(c);i++){
-        print_item(c[i]);
-    }
+    print_item_list(c, value_map, "closure");
 
     Item* g = goto_table(G, c, first, LEFT_PAR);
 
-    printf("--- goto ---\n");
-    for(int i = 0;i<dynarray_length(g);i++){
-        print_item(g[i]);
-    }
+    print_item_list(g, value_map, "goto");
     
     //printf("Moment of Truth\n");
     TableMaterial table_material = c_collection(G, first);
+
+    print_canonical_collection(table_material.CC, value_map);
+    
     //CC_Item* CC = table_material.CC;
     //LRTransition* trans = table_material.goto_transitions;
 
@@ -965,7 +1172,7 @@ int main() {
     dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, end_of_file);
 
-    parser_skeleton(G, tables_info, scanner_out, 0);
+    parser_skeleton(G, tables_info, scanner_out, 0, value_map);
 
     Hash my_dict = dynadict_create(4, int);
     printf("\n--- [TEST] Dictionary Created (Capacity: 4) ---\n");
@@ -1034,37 +1241,6 @@ int main() {
     // 7. Cleanup (Optional but good practice)
     // You'd want a _hash_destroy function here eventually!
     printf("\n--- [TEST] Verification Complete ---\n");
-
-    Pair mapping[] = {
-        {"End", END},
-        {"Epsilon", EPSILON_P},
-        {"Goal", 2},
-        {"List", 3},
-        {"Pair", 4},
-        {"(", 5},
-        {")", 6}
-    };
-
-    Hash dict_map = dictionary_from_mapping(mapping, 7);
-    char** value_map = storage_table_from_mapping(mapping, 7);
-
-    char* k = "Goal";
-    printf("%d\n", *((int*) dynadict_get(dict_map, k)));
-    printf("%s\n", value_map[2]);
-
-    char* prod_rules_src = "Goal -> List;"
-                           "List -> List Pair;"
-                           "|    -> Pair;"
-                           "Pair -> ( Pair );"
-                           "|    -> ( );"
-    ;
-
-    int ignore_categories[] = {1};
-
-    char* re_rules = "[a-zA-Z/(/)]*$02|/|$03|(->)$04|;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
-    FA rules_regex = MakeFA(re_rules, true);
-    Token* tokens = scanner_loop_string(rules_regex, prod_rules_src, ignore_categories, 1);
-    print_token_seq(tokens);
               
     //Hash my_map = hash_create(5, Item*, hash_item_list);
 
