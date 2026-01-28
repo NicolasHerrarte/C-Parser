@@ -9,6 +9,9 @@
 #include "hash.h"
 #include "scanner.h"
 #include "re_pp.h"
+#include "tree.h"
+
+#define DEFAULT_STACK_SIZE 3
 
 enum {
     END,
@@ -54,6 +57,7 @@ typedef struct LRTransition{
 
 typedef union StackItem{
     Token token;
+    void* s_ptr;
     int s_int;
 } StackItem;
 
@@ -822,12 +826,15 @@ void print_stack(StackItem* stack, char** index_mapping) {
     
     for (int i = 0; i < len; i++) {
         // Even index (0, 2, 4...) -> It's a Symbol/Token
-        if (i % 2 == 0) {
+        if (i % DEFAULT_STACK_SIZE == 1) {
             printf("%s ", index_mapping[stack[i].token.category]);
         } 
         // Odd index (1, 3, 5...) -> It's a State (int)
-        else {
+        else if (i % DEFAULT_STACK_SIZE == 2){
             printf("%d ", stack[i].s_int);
+        }
+        else if (i % DEFAULT_STACK_SIZE == 0){
+            //printf("%s ", ((TreeNode*) (stack[i].s_ptr))->name);
         }
     }
     
@@ -854,18 +861,22 @@ char** storage_table_from_mapping(Pair* mapping, int map_size){
     return inverse_map;
 }
 
-void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters, char** index_mapping){
+TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters, char** index_mapping){
+
     StackItem* stack = dynarray_create_prealloc(StackItem,100);
     StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
 
+    StackItem first_node;
     StackItem first_word;
     StackItem first_state;
 
     first_state.s_int = 0;
 
-    first_word.token.word = "WHAT";
+    first_node.s_ptr = tree_make_node(0, "Root", NULL);
+    first_word.token.word = "";
     first_word.token.category = END;
 
+    dynarray_push(stack, first_node);
     dynarray_push(stack, first_word);
     dynarray_push(stack, first_state);
 
@@ -889,39 +900,58 @@ void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_par
             int A = G.productions[prod_rule].alpha;
             int* beta = G.productions[prod_rule].beta;
 
-            for(int i=0;i<(2+extra_parameters)*dynarray_length(beta);i++){
+            StackItem new_token;
+            new_token.token.word = index_mapping[A];
+            new_token.token.category = A;
+            
+            TreeNode** children = malloc(dynarray_length(beta)*sizeof(TreeNode*));
+            for(int i=0;i<dynarray_length(beta);i++){
+                int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE+extra_parameters));
+                assert(s>0);
+                children[i] = (TreeNode*) stack[s].s_ptr;
+            }
+
+            TreeNode* tmp_node = tree_make_node(dynarray_length(beta), new_token.token.word, children);
+
+            free(children);
+
+            for(int i=0;i<(DEFAULT_STACK_SIZE+extra_parameters)*dynarray_length(beta);i++){
                 dynarray_pop(stack, &token_bs[i]);
             }
             
             //printf("stack get %d\n", dynarray_get_last(stack).s_int);
             //printf("already_mapped %d\n", tb.symbols_mapping[A]);
             int to_state = tb.table_goto[dynarray_get_last(stack).s_int][tb.symbols_mapping[A]];
-
-            StackItem new_token;
+            
+            StackItem new_node;
             StackItem new_state;
-
-            new_token.token.word = "WHAT";
-            new_token.token.category = A;
-
+            
+            new_node.s_ptr = tmp_node;
             new_state.s_int = to_state;
             
+            dynarray_push(stack, new_node);
             dynarray_push(stack, new_token);
             dynarray_push(stack, new_state);
            
             
-            printf("Reduce -> %d\n", prod_rule+1);
+            printf("Reduce -> %d\n", prod_rule+1); 
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 2){
             int to_state = tb.table_action[top_state.s_int][word_category_table][1];
-
+            
+            StackItem new_node;
             StackItem new_token;
             StackItem new_state;
 
-            new_token.token.word = "WHAT";
+            TreeNode* tmp_node = tree_make_node(0, index_mapping[token_ptr->category], NULL);
+            
+            new_node.s_ptr = tmp_node;
+            new_token.token.word = index_mapping[token_ptr->category];
             new_token.token.category = token_ptr->category;
 
             new_state.s_int = to_state;
 
+            dynarray_push(stack, new_node);
             dynarray_push(stack, new_token);
             dynarray_push(stack, new_state);
 
@@ -932,16 +962,21 @@ void parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_par
             printf("Shift -> %d\n", to_state);
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 1){
-            printf("Accept");
+            printf("Accept\n");
             break;
         }
         else{
-            printf("Error");
+            printf("Error\n");
             break;
         }
 
         //printf("%s", token_ptr->word);
     } while(true);
+
+    TreeNode* root = (TreeNode*) stack[DEFAULT_STACK_SIZE+extra_parameters].s_ptr;
+    free(first_node.s_ptr);
+
+    return root;
 }
 
 bool int_equal(void* a, void* b) {
@@ -950,7 +985,6 @@ bool int_equal(void* a, void* b) {
 
 Grammar build_grammar(char * lexing_rules, Hash dict_mapping, int symbols_amount){
     int ignore_categories[] = {1};
-
     char* re_rules = "([a-zA-Z/(/);])*$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     FA rules_regex = MakeFA(re_rules, true);
     Token* token = scanner_loop_string(rules_regex, lexing_rules, ignore_categories, 1);
@@ -1033,44 +1067,6 @@ int main() {
     Hash dict_map = dictionary_from_mapping(mapping, 7);
     char** value_map = storage_table_from_mapping(mapping, 7);
 
-    // Make a way for this initialization to be made only with rules and string not this bs
-    Grammar G = create_grammar();
-    int terminals[] = {LEFT_PAR, RIGHT_PAR, EPSILON_P, END};
-    int non_terminals[] = {GOAL, LIST, PAIR};
-
-    G.S = GOAL;
-
-    int b0[] = {LIST};
-    Production item0 = create_production(GOAL, b0, 1);
-    dynarray_push(G.productions, item0);
-
-    int b1[] = {LIST, PAIR};
-    Production item1 = create_production(LIST, b1, 2);
-    dynarray_push(G.productions, item1);
-
-    int b2[] = {PAIR};
-    Production item2 = create_production(LIST, b2, 1);
-    dynarray_push(G.productions, item2);
-
-    int b3[] = {LEFT_PAR, PAIR, RIGHT_PAR};
-    Production item3 = create_production(PAIR, b3, 3);
-    dynarray_push(G.productions, item3);
-
-    int b4[] = {LEFT_PAR, RIGHT_PAR};
-    Production item4 = create_production(PAIR, b4, 2);
-    dynarray_push(G.productions, item4);
-
-    for(int i = 0;i<4;i++){
-        int t = terminals[i];
-        dynarray_push(G.T, t);
-    }
-    for(int i = 0;i<3;i++){
-        int nt = non_terminals[i];
-        dynarray_push(G.NT, nt);
-    }
- 
-    print_grammar(G, value_map);
-
     char* k = "Goal";
     printf("%d\n", *((int*) dynadict_get(dict_map, k)));
     printf("%s\n", value_map[2]);
@@ -1082,9 +1078,9 @@ int main() {
                            "/|   /-> ( ) /;"
     ;
 
-    Grammar Gt = build_grammar(prod_rules_src, dict_map, 7);
-    print_grammar(Gt, value_map);
-    
+    Grammar G = build_grammar(prod_rules_src, dict_map, 7);
+    print_grammar(G, value_map);
+
 
     Subset* first = generate_first(G);
 
@@ -1170,98 +1166,11 @@ int main() {
     dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, rpar);
+    dynarray_push(scanner_out, lpar);
+    dynarray_push(scanner_out, rpar);
     dynarray_push(scanner_out, end_of_file);
 
-    parser_skeleton(G, tables_info, scanner_out, 0, value_map);
-
-    Hash my_dict = dynadict_create(4, int);
-    printf("\n--- [TEST] Dictionary Created (Capacity: 4) ---\n");
-
-    // 2. Define Test Data
-    char* k1 = "variable_x";
-    char* k2 = "variable_y";
-    char* k3 = "variable_z";
-    char* kn = "not_there";
-    int v1 = 10, v2 = 20, v3 = 30;
-
-    // 3. Test Insertion
-    printf("\n--- Phase 1: Adding Items ---\n");
-    dynadict_add(my_dict, k1, v1);
-    printf("Added '%s' (Value: %d). Count: %lu\n", k1, v1, (unsigned long)my_dict.count);
-    
-    dynadict_add(my_dict, k2, v2);
-    printf("Added '%s' (Value: %d). Count: %lu\n", k2, v2, (unsigned long)my_dict.count);
-
-    // 4. Test Key Presence
-    printf("\n--- Phase 2: Checking Existence ---\n");
-    if (dynadict_key_in(my_dict, k1)) printf("SUCCESS: '%s' found.\n", k1);
-    else printf("FAILURE: '%s' missing.\n", k1);
-
-    if (dynadict_key_in(my_dict, kn)) printf("FAILURE: Found a ghost key!\n");
-    else printf("SUCCESS: 'not_there' correctly not found.\n");
-
-    int* list = (int*) hash_to_list(my_dict);
-    
-    // Note: In a dense array with holes, you might need to be careful.
-    // If your _hash_to_list doesn't pack the array, 
-    // we iterate up to the count or the current capacity.
-    for(int i = 0; i < (int)my_dict.count; i++) {
-        printf("List Item [%d]: %d\n", i, list[i]);
-    }
-
-    // 5. Test Retrieval
-    printf("\n--- Phase 3: Getting Values ---\n");
-    int* ptr_y = (int*)dynadict_get(my_dict, k2);
-    if (ptr_y) printf("Retrieved '%s' -> Value: %d\n", k2, *ptr_y);
-    else printf("FAILURE: Could not get value for '%s'\n", k2);
-
-    // 6. Test Deletion & Memory Reuse (The "Hole" Logic)
-    printf("\n--- Phase 4: Deletion & Hole Management ---\n");
-    printf("Initial holes count: %lu\n", (unsigned long)dynarray_length(my_dict.holes));
-    
-    dynadict_remove(my_dict, k1);
-    printf("Removed '%s'. Count: %lu\n", k1, (unsigned long)my_dict.count);
-    printf("Holes count after removal: %lu\n", (unsigned long)dynarray_length(my_dict.holes));
-
-    // Adding a new item to trigger the 'hole' reuse code path
-    char* k4 = "new_var";
-    int v4 = 99;
-    printf("Adding '%s' (Value: %d)...\n", k4, v4);
-    dynadict_add(my_dict, k4, v4);
-    
-    printf("Holes count after reuse: %lu\n", (unsigned long)dynarray_length(my_dict.holes));
-    printf("Final Dictionary Count: %lu\n", (unsigned long)my_dict.count);
-
-    list = (int*)hash_to_list(my_dict);
-    printf("--- Final List State ---\n");
-    for(int i = 0; i < (int)my_dict.count; i++) {
-        printf("List Item [%d]: %d\n", i, list[i]);
-    }
-
-    // 7. Cleanup (Optional but good practice)
-    // You'd want a _hash_destroy function here eventually!
-    printf("\n--- [TEST] Verification Complete ---\n");
-              
-    //Hash my_map = hash_create(5, Item*, hash_item_list);
-
-    //printf("%llu", hash_item_list(c));
-
-    //hash_add(my_map, g, hash_item_list_equal);
-    //hash_add(my_map, g, hash_item_list_equal);
-    //hash_add(my_map, c, hash_item_list_equal);
-    //hash_add(my_map, s, hash_item_list_equal);
-
-
-    //Item** tl = my_map.obj_storage;
-
-
-    //printf("AAAA");
-    //for(int i = 0;i<dynarray_length(tl);i++){
-        //printf("---\n");
-        //for(int j = 0;j<dynarray_length(tl[i]);j++){
-            //print_item(tl[i][j]);
-        //}
-        //printf("---\n");
-    //}
-    
+    TreeNode* root = parser_skeleton(G, tables_info, scanner_out, 0, value_map);
+    printf("\n--- Parse Tree ---\n");
+    print_tree(root, "", true, true);
 }
