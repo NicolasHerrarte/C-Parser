@@ -321,12 +321,13 @@ Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state
             }
     }
     }
-
+    
     if (parenthesis_depth != 0){
         printf("Parenthesis Mismatch -> %d", parenthesis_depth);
         Fragment error_fragment = {0, 0};
-        return error_fragment;
     }
+
+    assert(parenthesis_depth == 0);
 
     //printf("(%d, %d) (%d, %d)\n",left_fragment.start_index, left_fragment.end_index, right_fragment.start_index, left_fragment.end_index);
 

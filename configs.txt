@@ -1,12 +1,13 @@
 parenthesis config
 
 languaje.k ((()))()((()))(())
-prod_rules "Goal /-> List /;"
-            "List /-> List Pair /;"
-            "/|   /-> Pair /;"
-            "Pair /-> ( Pair ) /;"
-            "/|   /-> ( ) /;"
-lexer_rules "/($05|/)$06"
+production rules "Goal /-> List /; "
+            "List /-> List Pair /; "
+            "/|   /-> Pair /; "
+            "Pair /-> ( Pair ) /; "
+            "/|   /-> ( ) /; "
+
+lexer rules "/($05|/)$06"
 
 mappings Pair mapping[] = {
         {"End", END},
@@ -17,3 +18,25 @@ mappings Pair mapping[] = {
         {"(", 5},
         {")", 6}
     };
+
+conflict if then else grammar
+
+production rules "Goal /-> Stmt /; "
+                 "Stmt /-> if expr then Stmt /; "
+                 "/|   /-> if expr then Stmt else Stmt /; "
+                 "/|   /-> assign /; "
+
+lexer rules 
+
+mappings Pair mapping[] = {
+        {"End", END},
+        {"Epsilon", EPSILON_P},
+        {"Goal", 2},
+        {"Stmt", 3},
+        {"if", 4},
+        {"expr", 5},
+        {"then", 6},
+        {"else", 7},
+        {"assign", 8},
+    };
+

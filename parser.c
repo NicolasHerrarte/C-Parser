@@ -798,6 +798,11 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
         LRTransition curr_trans = tb.goto_transitions[i];
         if(SS_in(fast_terminal, curr_trans.trans_symbol)){
             //printf("Action[i->%d, c->%d] = shift j->%d\n", curr_trans.state_from, curr_trans.trans_symbol, curr_trans.state_to);
+            if(table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][0] == 3){
+                printf("Shift Reduce Conflict at state: %d symbol: %d\n", i, curr_trans.trans_symbol);
+            }
+            assert(table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][0] == 0);
+
             table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][0] = 2;
             table_action[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]][1] = curr_trans.state_to;
         }
@@ -825,6 +830,14 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
                         }
                     }
                     //printf("Action[i->%d, a->%d] = reduce p->%d\n", i, curr_item.lookahead, p_rule+1);
+                    if(table_action[i][symbols_mapping[curr_item.lookahead]][0] == 2){
+                        printf("Shift Reduce Conflict at state: %d symbol: %d\n", i, curr_item.lookahead);
+                    }
+                    else if(table_action[i][symbols_mapping[curr_item.lookahead]][0] == 3){
+                        printf("Reduce Reduce Conflict at state: %d symbol: %d\n", i, curr_item.lookahead);
+                    }
+
+                    assert(table_action[i][symbols_mapping[curr_item.lookahead]][0] == 0);
                     table_action[i][symbols_mapping[curr_item.lookahead]][0] = 3;
                     table_action[i][symbols_mapping[curr_item.lookahead]][1] = p_rule;
                 }
@@ -976,13 +989,13 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
             StackItem new_token;
             StackItem new_state;
 
-            TreeNode* tmp_node = tree_make_node(0, index_mapping[token_ptr->category], NULL);
+            TreeNode* tmp_node = tree_make_node(0, token_ptr->word, NULL);
             
             //printf("TMP NODE");
             //print_node_info(tmp_node);
             
             new_node.s_ptr = tmp_node;
-            new_token.token.word = index_mapping[token_ptr->category];
+            new_token.token.word = token_ptr->word;
             new_token.token.category = token_ptr->category;
 
             new_state.s_int = to_state;
@@ -1021,7 +1034,7 @@ bool int_equal(void* a, void* b) {
 
 Grammar build_grammar(char *lexing_rules, Hash dict_mapping, int symbols_amount){
     int ignore_categories[] = {1};
-    char* re_rules = "([a-zA-Z/(/);])*$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    char* re_rules = "([a-zA-Z/(/)/*///-+;])*$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     FA rules_regex = MakeFA(re_rules, true);
     Token* token = scanner_loop_string(rules_regex, lexing_rules, ignore_categories, 1);
     print_token_seq(token);
@@ -1095,24 +1108,36 @@ int main() {
         {"End", END},
         {"Epsilon", EPSILON_P},
         {"Goal", 2},
-        {"Stmt", 3},
-        {"if", 4},
-        {"expr", 5},
-        {"then", 6},
-        {"else", 7},
-        {"assign", 8},
+        {"Expr", 3},
+        {"Term", 4},
+        {"Factor", 5},
+        {"+", 6},
+        {"-", 7},
+        {"*", 8},
+        {"/", 9},
+        {"(", 10},
+        {")", 11},
+        {"num", 12},
+        {"name", 13},
+        
     };
 
-    int symbols_amount = 9;
+    int symbols_amount = 14;
 
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
 
 
-    char* prod_rules_src = "Goal /-> Stmt /;"
-                           "Stmt /-> if expr then Stmt /;"
-                           "/|   /-> if expr then Stmt else Stmt /;"
-                           "/|   /-> assign /;"
+    char* prod_rules_src =  "Goal    /-> Expr /; "
+                            "Expr    /-> Expr + Term /; "
+                            "/|      /-> Expr - Term /; "
+                            "/|      /-> Term /; "
+                            "Term    /-> Term * Factor /; "
+                            "/|      /-> Term / Factor /; "
+                            "/|      /-> Factor /; "
+                            "Factor  /-> ( Expr ) /; "
+                            "/|      /-> num /; "
+                            "/|      /-> name /; "
     ;
 
     Grammar G = build_grammar(prod_rules_src, dict_map, symbols_amount);
@@ -1164,13 +1189,16 @@ int main() {
     TableMapping tables_info = create_tables(G, table_material);
     print_tables(&tables_info);
 
-    return 0;
+    //return 0;
 
     char* file_dir = "languaje.k";
 
-    char* lexing_rules = "/($05|/)$06";
+    char* lexing_rules = "(0|[1-9][0-9]*)$12|([a-zA-Z][a-zA-Z]*)$13|+$06|-$07|/*$08|//$09|/($10|/)$11|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+
+    int ignore_categories[] = {1};
+
     FA rules_regex = MakeFA(lexing_rules, true);
-    Token* scanner_out = scanner_loop_file(rules_regex, file_dir, NULL, 0);
+    Token* scanner_out = scanner_loop_file(rules_regex, file_dir, ignore_categories, 1);
     print_token_seq(scanner_out);
 
     TreeNode* root = parser_skeleton(G, tables_info, scanner_out, 0, value_map);
