@@ -983,7 +983,7 @@ bool int_equal(void* a, void* b) {
     return *(int*)a == *(int*)b;
 }
 
-Grammar build_grammar(char * lexing_rules, Hash dict_mapping, int symbols_amount){
+Grammar build_grammar(char *lexing_rules, Hash dict_mapping, int symbols_amount){
     int ignore_categories[] = {1};
     char* re_rules = "([a-zA-Z/(/);])*$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     FA rules_regex = MakeFA(re_rules, true);
@@ -1149,26 +1149,12 @@ int main() {
     TableMapping tables_info = create_tables(G, table_material);
     print_tables(&tables_info);
 
-    Token* scanner_out = dynarray_create(Token);
-    Token lpar;
-    lpar.word = "(";
-    lpar.category = 5;
-    Token rpar;
-    rpar.word = ")";
-    rpar.category = 6;
-    Token end_of_file;
-    end_of_file.word = "\0";
-    end_of_file.category = 0;
+    char* file_dir = "languaje.k";
 
-    dynarray_push(scanner_out, lpar);
-    dynarray_push(scanner_out, lpar);
-    dynarray_push(scanner_out, lpar);
-    dynarray_push(scanner_out, rpar);
-    dynarray_push(scanner_out, rpar);
-    dynarray_push(scanner_out, rpar);
-    dynarray_push(scanner_out, lpar);
-    dynarray_push(scanner_out, rpar);
-    dynarray_push(scanner_out, end_of_file);
+    char* lexing_rules = "/($05|/)$06";
+    FA rules_regex = MakeFA(lexing_rules, true);
+    Token* scanner_out = scanner_loop_file(rules_regex, file_dir, NULL, 0);
+    print_token_seq(scanner_out);
 
     TreeNode* root = parser_skeleton(G, tables_info, scanner_out, 0, value_map);
     printf("\n--- Parse Tree ---\n");
