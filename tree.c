@@ -39,6 +39,7 @@ void print_tree(TreeNode* node, char* prefix, bool is_last, bool is_root) {
     } else {
         // Standard branch for everyone else
         printf("%s%s%s\n", prefix, is_last ? "└── " : "├── ", node->name);
+        //printf("%s%s%s\n", prefix, is_last ? "└── " : "├── ", node->name);
     }
 
     // Update prefix only if we aren't at the root

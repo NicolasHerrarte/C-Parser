@@ -1,0 +1,19 @@
+parenthesis config
+
+languaje.k ((()))()((()))(())
+prod_rules "Goal /-> List /;"
+            "List /-> List Pair /;"
+            "/|   /-> Pair /;"
+            "Pair /-> ( Pair ) /;"
+            "/|   /-> ( ) /;"
+lexer_rules "/($05|/)$06"
+
+mappings Pair mapping[] = {
+        {"End", END},
+        {"Epsilon", EPSILON_P},
+        {"Goal", 2},
+        {"List", 3},
+        {"Pair", 4},
+        {"(", 5},
+        {")", 6}
+    };

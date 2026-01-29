@@ -17,10 +17,6 @@ enum {
     END,
     EPSILON_P,
     GOAL,
-    LIST,
-    PAIR, 
-    LEFT_PAR,
-    RIGHT_PAR
 };
 
 typedef struct Production{
@@ -82,14 +78,42 @@ typedef struct Pair{
     int value;
 } Pair;
 
-void print_transitionLR(LRTransition t){
-    printf("State: ");
-    printf("%d ", t.state_from);
-    printf("- ");
-    printf("%d ", t.trans_symbol);
-    printf("-> State: ");
-    printf("%d", t.state_to);
-    printf("\n");
+void print_transition_single(LRTransition t, char** symbol_names) {
+    printf("  State %d --( %s )--> State %d\n", 
+           t.state_from, 
+           symbol_names[t.trans_symbol], 
+           t.state_to);
+}
+
+void print_transition_list(LRTransition* transitions, char** symbol_names) {
+    int count = dynarray_length(transitions);
+    
+    printf("\n=== LR(1) Transition Table (%d entries) ===\n", count);
+    for (int i = 0; i < count; i++) {
+        // Accessing and passing the object by value
+        print_transition_single(transitions[i], symbol_names);
+    }
+    printf("============================================\n");
+}
+
+void print_transitions(LRTransition* transitions, int count, char** symbol_names, int num_terminals) {
+    printf("\n%-12s | %-15s | %-12s | %-10s\n", "From State", "Symbol", "To State", "Type");
+    printf("------------------------------------------------------------------\n");
+
+    for (int i = 0; i < count; i++) {
+        LRTransition t = transitions[i];
+        
+        // Determine if it's a Terminal (Shift) or Non-Terminal (Goto)
+        // This assumes your symbol mapping puts Terminals first
+        const char* type = (t.trans_symbol < num_terminals) ? "SHIFT" : "GOTO";
+
+        printf("State %-6d | %-15s | State %-7d | %-10s\n", 
+               t.state_from, 
+               symbol_names[t.trans_symbol], 
+               t.state_to, 
+               type);
+    }
+    printf("------------------------------------------------------------------\n");
 }
 
 bool item_equal(Item item1, Item item2){
@@ -467,7 +491,6 @@ Item* item_closure(Grammar G, Item* s_raw, Subset* first){
                         if(delta == EPSILON_P){
                             continue;
                         }
-                        found_delta_first = true;
 
                         Subset delta_first = first[delta];
                         int* delta_first_list = SS_to_list_indexes(delta_first);
@@ -485,7 +508,9 @@ Item* item_closure(Grammar G, Item* s_raw, Subset* first){
                             
                         } 
 
+                        found_delta_first = true;
                         dynarray_destroy(delta_first_list);
+                        break;
                     }
 
                     if(found_delta_first == false){
@@ -550,6 +575,7 @@ TableMaterial c_collection(Grammar G, Subset* first){
     CC_Item cc0;
     cc0.cc = item_closure(G, s, first);
     cc0.marked = false;
+    cc0.state = 0;
 
     CC_Item* CC = dynarray_create(CC_Item);
     LRTransition* trans = dynarray_create(LRTransition);
@@ -834,7 +860,7 @@ void print_stack(StackItem* stack, char** index_mapping) {
             printf("%d ", stack[i].s_int);
         }
         else if (i % DEFAULT_STACK_SIZE == 0){
-            //printf("%s ", ((TreeNode*) (stack[i].s_ptr))->name);
+            printf("%d ", ((TreeNode*) (stack[i].s_ptr))->children_amount);
         }
     }
     
@@ -864,7 +890,7 @@ char** storage_table_from_mapping(Pair* mapping, int map_size){
 TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters, char** index_mapping){
 
     StackItem* stack = dynarray_create_prealloc(StackItem,100);
-    StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
+    //StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
 
     StackItem first_node;
     StackItem first_word;
@@ -909,14 +935,21 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
                 int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE+extra_parameters));
                 assert(s>0);
                 children[i] = (TreeNode*) stack[s].s_ptr;
+                //printf("MAYBE\n");
+                //printf("%d, %d\n", s, dynarray_length(stack));
+                //print_node_info(children[i]);
             }
 
             TreeNode* tmp_node = tree_make_node(dynarray_length(beta), new_token.token.word, children);
 
+            //printf("TMP NODE");
+            //print_node_info(tmp_node);
+
             free(children);
 
             for(int i=0;i<(DEFAULT_STACK_SIZE+extra_parameters)*dynarray_length(beta);i++){
-                dynarray_pop(stack, &token_bs[i]);
+                StackItem trash;
+                dynarray_pop(stack, &trash);
             }
             
             //printf("stack get %d\n", dynarray_get_last(stack).s_int);
@@ -944,6 +977,9 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
             StackItem new_state;
 
             TreeNode* tmp_node = tree_make_node(0, index_mapping[token_ptr->category], NULL);
+            
+            //printf("TMP NODE");
+            //print_node_info(tmp_node);
             
             new_node.s_ptr = tmp_node;
             new_token.token.word = index_mapping[token_ptr->category];
@@ -974,7 +1010,7 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
     } while(true);
 
     TreeNode* root = (TreeNode*) stack[DEFAULT_STACK_SIZE+extra_parameters].s_ptr;
-    free(first_node.s_ptr);
+    //free(first_node.s_ptr);
 
     return root;
 }
@@ -1051,6 +1087,7 @@ Grammar build_grammar(char *lexing_rules, Hash dict_mapping, int symbols_amount)
     return G;
 }
 
+
 int main() {
     printf("Parser...\n");
 
@@ -1058,27 +1095,27 @@ int main() {
         {"End", END},
         {"Epsilon", EPSILON_P},
         {"Goal", 2},
-        {"List", 3},
-        {"Pair", 4},
-        {"(", 5},
-        {")", 6}
+        {"Stmt", 3},
+        {"if", 4},
+        {"expr", 5},
+        {"then", 6},
+        {"else", 7},
+        {"assign", 8},
     };
 
-    Hash dict_map = dictionary_from_mapping(mapping, 7);
-    char** value_map = storage_table_from_mapping(mapping, 7);
+    int symbols_amount = 9;
 
-    char* k = "Goal";
-    printf("%d\n", *((int*) dynadict_get(dict_map, k)));
-    printf("%s\n", value_map[2]);
+    Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
+    char** value_map = storage_table_from_mapping(mapping, symbols_amount);
 
-    char* prod_rules_src = "Goal /-> List /;"
-                           "List /-> List Pair /;"
-                           "/|   /-> Pair /;"
-                           "Pair /-> ( Pair ) /;"
-                           "/|   /-> ( ) /;"
+
+    char* prod_rules_src = "Goal /-> Stmt /;"
+                           "Stmt /-> if expr then Stmt /;"
+                           "/|   /-> if expr then Stmt else Stmt /;"
+                           "/|   /-> assign /;"
     ;
 
-    Grammar G = build_grammar(prod_rules_src, dict_map, 7);
+    Grammar G = build_grammar(prod_rules_src, dict_map, symbols_amount);
     print_grammar(G, value_map);
 
 
@@ -1086,49 +1123,26 @@ int main() {
 
     print_first_sets(G, first, value_map);
     
-    Item initial_item;
-    initial_item.alpha = GOAL;
-    int* master_beta = dynarray_create(int);
-    initial_item.beta = &master_beta;
-    dynarray_push_rval(*initial_item.beta, LIST);
-    initial_item.lookahead = END;
-    initial_item.k = 0;
+    //Item initial_item;
+    //initial_item.alpha = GOAL;
+    //int* master_beta = dynarray_create(int);
+    //initial_item.beta = &master_beta;
+    //dynarray_push_rval(*initial_item.beta, LIST);
+    //initial_item.lookahead = END;
+    //initial_item.k = 0;
 
-    Item initial_item1;
-    initial_item1.alpha = LIST;
-    int* master_beta1 = dynarray_create(int);
-    initial_item1.beta = &master_beta1;
-    dynarray_push_rval(*initial_item1.beta, LIST);
-    dynarray_push_rval(*initial_item1.beta, PAIR);
-    initial_item1.lookahead = END;
-    initial_item1.k = 1;
-
-    Item initial_item2;
-    initial_item2.alpha = LIST;
-    int* master_beta2 = dynarray_create(int);
-    initial_item2.beta = &master_beta2;
-    dynarray_push_rval(*initial_item2.beta, LIST);
-    dynarray_push_rval(*initial_item2.beta, PAIR);
-    initial_item2.lookahead = LEFT_PAR;
-    initial_item2.k = 1;
-
-    Item* s = dynarray_create(Item);
-    dynarray_push(s, initial_item);
-    dynarray_push(s, initial_item1);
-    dynarray_push(s, initial_item2);
-
-    Item* c = item_closure(G, s, first);
-
-    print_item_list(c, value_map, "closure");
-
-    Item* g = goto_table(G, c, first, LEFT_PAR);
-
-    print_item_list(g, value_map, "goto");
-    
+    //Item* s = dynarray_create(Item);
+    //dynarray_push(s, initial_item);
+    //Item* c = item_closure(G, s, first);
+    //print_item_list(c, value_map, "closure");
+    //Item* g = goto_table(G, c, first, LEFT_PAR);
+    //print_item_list(g, value_map, "goto");
     //printf("Moment of Truth\n");
+
     TableMaterial table_material = c_collection(G, first);
 
     print_canonical_collection(table_material.CC, value_map);
+    print_transition_list(table_material.goto_transitions, value_map);
     
     //CC_Item* CC = table_material.CC;
     //LRTransition* trans = table_material.goto_transitions;
@@ -1146,8 +1160,11 @@ int main() {
         //print_transition(trans[i]);
     //}
 
+    
     TableMapping tables_info = create_tables(G, table_material);
     print_tables(&tables_info);
+
+    return 0;
 
     char* file_dir = "languaje.k";
 
