@@ -1,0 +1,31 @@
+
+--- FIRST SETS ---
+FIRST(Goal) = { (, num, name, string, true, false, if, while, for, Init, Proc, return, break, continue, goto }
+FIRST(Expr) = { (, num, name, string, true, false }
+FIRST(Eval) = { (, num, name, string, true, false }
+FIRST(Term) = { (, num, name, string, true, false }
+FIRST(Factor) = { (, num, name, string, true, false }
+FIRST(Access) = { (, name }
+FIRST(AccessBase) = { (, name }
+FIRST(LoP) = { =?, >=, <=, >, < }
+FIRST(Args) = { ε, (, num, name, string, true, false }
+FIRST(ArgList) = { (, num, name, string, true, false }
+FIRST(Program) = { (, num, name, string, true, false, if, while, for, Init, Proc, return, break, continue, goto }
+FIRST(Block) = { { }
+FIRST(CompStat) = { (, num, name, string, true, false, if, while, for, Init, Proc, return, break, continue, goto }
+FIRST(UnitStat) = { (, num, name, string, true, false, if, while, for, Init, Proc, return, break, continue, goto }
+FIRST(ControlStat) = { if, while, for, Proc }
+FIRST(Stat) = { (, num, name, string, true, false, Init }
+FIRST(CondStat) = { if }
+FIRST(LoopStat) = { while, for }
+FIRST(While) = { while }
+FIRST(For) = { for }
+FIRST(Declaration) = { Init }
+FIRST(ProcDeclaration) = { Proc }
+FIRST(Assignment) = { (, name }
+FIRST(VarType) = { string, int, bool, float }
+FIRST(Primitive) = { string, int, bool, float }
+FIRST(Jump) = { return, break, continue, goto }
+FIRST(Params) = { ε, name }
+FIRST(ParamsList) = { name }
+------------------

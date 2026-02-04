@@ -40,3 +40,41 @@ mappings Pair mapping[] = {
         {"assign", 8},
     };
 
+expr grammar
+
+production rules
+
+Goal    /-> Expr /;
+Expr    /-> Expr + Term /;
+/|      /-> Expr - Term /;
+/|      /-> Term /;
+Term    /-> Term * Factor /;
+/|      /-> Term / Factor /;
+/|      /-> Factor /;
+Factor  /-> ( Expr ) /;
+/|      /-> num /;
+/|      /-> name /;
+
+lexing rules 
+
+char* lexing_rules = "(0|[1-9][0-9]*)$12|([a-zA-Z][a-zA-Z]*)$13|+$06|-$07|/*$08|//$09|/($10|/)$11|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+
+mappings
+
+Pair mapping[] = {
+        {"End", END},
+        {"Epsilon", EPSILON_P},
+        {"Goal", 2},
+        {"Expr", 3},
+        {"Term", 4},
+        {"Factor", 5},
+        {"+", 6},
+        {"-", 7},
+        {"*", 8},
+        {"/", 9},
+        {"(", 10},
+        {")", 11},
+        {"num", 12},
+        {"name", 13},  
+    };
+

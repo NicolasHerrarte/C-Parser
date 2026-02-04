@@ -1,0 +1,95 @@
+Goal            /-> Program /;
+
+Program         /-> CompStat /;
+
+Block           /-> { CompStat } /;
+
+CompStat        /-> UnitStat /;
+/|              /-> CompStat UnitStat /;
+
+UnitStat        /-> Stat ; /;
+/|              /-> ControlStat /;
+/|              /-> Jump ; /;
+
+ControlStat     /-> CondStat /;
+/|              /-> LoopStat /;
+/|              /-> ProcDeclaration /;
+
+Stat            /-> Declaration /;
+/|              /-> Assignment /;
+/|              /-> Expr /;
+
+CondStat        /-> if ( Expr ) Block /;
+/|              /-> if ( Expr ) Block else CondStat /;
+/|              /-> if ( Expr ) Block else Block /;
+
+LoopStat        /-> While /;
+/|              /-> For /;
+
+While           /-> while ( Expr ) Block /;
+
+For             /-> for ( Stat ; Expr ; Stat ) Block /;
+
+Declaration     /-> Init VarType name /;
+/|              /-> Init VarType name <- Expr /;
+
+ProcDeclaration /-> Proc name ( Params ) -> VarType Block /;
+
+Assignment      /-> Access = Expr /;
+
+VarType         /-> Primitive /;
+/|              /-> VarType [ ] /;
+
+Primitive       /-> int /;
+/|              /-> bool /;
+/|              /-> float /;
+/|              /-> string /;
+
+Jump            /-> break /;
+/|              /-> continue /;
+/|              /-> return /;
+/|              /-> return Expr /;
+/|              /-> goto Expr /;
+
+Args            /-> ArgList /;
+/|              /-> Epsilon /;
+
+ArgList         /-> ArgList , Expr /;
+/|              /-> Expr /;
+
+Params          /-> ParamsList /;
+/|              /-> Epsilon /;
+
+ParamsList      /-> ParamsList , name : VarType /;
+/|              /-> name : VarType /;
+
+Expr            /-> Expr LoP Eval /;
+/|              /-> Eval /;
+
+Eval            /-> Eval + Term /;
+/|              /-> Eval - Term /;
+/|              /-> Term /;
+
+Term            /-> Term * Factor /;
+/|              /-> Term / Factor /;
+/|              /-> Factor /;
+
+Factor          /-> Access /;
+/|              /-> num /;
+/|              /-> string /;
+/|              /-> true /;
+/|              /-> false /;
+
+Access          /-> Access [ Expr ] /;
+/|              /-> Access ( Args ) /;
+/|              /-> Access . name /;
+/|              /-> AccessBase /;
+
+AccessBase      /-> name /;
+/|              /-> ( Expr ) /;
+
+LoP             /-> =? /;
+/|              /-> >= /;
+/|              /-> <= /;
+/|              /-> > /;
+/|              /-> < /;

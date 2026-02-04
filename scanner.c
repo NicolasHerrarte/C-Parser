@@ -8,52 +8,65 @@
 #include "subset.h"
 #include "scanner.h"
 
-void print_safe_char(char c) {
+
+void export_safe_char(char c, FILE* out) {
     switch (c) {
-        case '\n': printf("\\n"); break;
-        case '\t': printf("\\t"); break;
-        case '\r': printf("\\r"); break;
-        case ' ':  printf("[SPC]"); break; // Or " " if you prefer
-        default:   printf("%c", c);   break;
+        case '\n': fprintf(out, "\\n"); break;
+        case '\t': fprintf(out, "\\t"); break;
+        case '\r': fprintf(out, "\\r"); break;
+        case ' ':  fprintf(out, "[SPC]"); break; // Or " " if you prefer
+        default:   fprintf(out, "%c", c);   break;
     }
+}
+
+void print_safe_char(char c) {
+    export_safe_char(c, stdout);
 }
 
 void print_transition(Transition t){
-    printf("State: ");
-    printf("%d ", t.state_from);
-    printf("- ");
-    print_safe_char(t.trans_char);
-    printf("-> State: ");
-    printf("%d", t.state_to);
-    printf("\n");
+    export_transition(t, stdout);
 }
 
-void FA_print(FA fa){
-    printf("-- States --\n");
+void export_transition(Transition t, FILE* out){
+    fprintf(out, "State: ");
+    fprintf(out, "%d ", t.state_from);
+    fprintf(out, "- ");
+    export_safe_char(t.trans_char, out);
+    fprintf(out, "-> State: ");
+    fprintf(out, "%d", t.state_to);
+    fprintf(out, "\n");
+}
+
+void FA_export(FA fa, FILE* out){
+    fprintf(out, "-- States --\n");
     for(int i = 0; i < dynarray_length(fa.states);i++){
-        printf("%d, ", fa.states[i]);
+        fprintf(out, "%d, ", fa.states[i]);
     }
-    printf("\n");
-    printf("-- Acceptable States --\n");
+    fprintf(out, "\n");
+    fprintf(out, "-- Acceptable States --\n");
     for(int i = 0; i < dynarray_length(fa.acceptable_states);i++){
-        printf("(%d-%d), ", fa.acceptable_states[i].state, fa.acceptable_states[i].category);
+        fprintf(out, "(%d-%d), ", fa.acceptable_states[i].state, fa.acceptable_states[i].category);
     }
-    printf("\n");
-    printf("-- Alphabet --\n");
+    fprintf(out, "\n");
+    fprintf(out, "-- Alphabet --\n");
     for(int i = 0; i < 256;i++){
         if(fa.alphabet[i] == true){
-            print_safe_char((unsigned char) i);
+            export_safe_char((unsigned char) i, out);
         }
         
     }
-    printf("\n");
+    fprintf(out, "\n");
     //printf("-- Transitions --\n");
     for(int i = 0; i < dynarray_length(fa.transitions);i++){
-        //print_transition(fa.transitions[i]);
+        export_transition(fa.transitions[i], out);
     }
 
-    printf("-- Starting State --\n");
-    printf("- %d\n", fa.initial_state);
+    fprintf(out, "-- Starting State --\n");
+    fprintf(out, "- %d\n", fa.initial_state);
+}
+
+void FA_print(FA fa){
+    FA_export(fa, stdout);
 }
 
 void states_print(int* states){
@@ -65,8 +78,12 @@ void states_print(int* states){
 }
 
 void print_token_seq(Token* tokens){
+    export_token_seq(tokens, stdout);
+}
+
+void export_token_seq(Token* tokens, FILE* out){
     for(int i = 0;i<dynarray_length(tokens);i++){
-        printf("(%s, %d)\n", tokens[i].word, tokens[i].category);
+        fprintf(out, "(%s, %d)\n", tokens[i].word, tokens[i].category);
     }
 }
 
@@ -579,9 +596,7 @@ Token* scanner_loop_file(FA dfa, char* directory, int* ignore_cats, int amount_i
 
     Token* token_list = dynarray_create(Token);
 
-    if(file_ptr == NULL){
-        return 0;
-    }
+    assert(file_ptr != NULL);
 
     int c_int;
     while((c_int = fgetc(file_ptr)) != EOF){
@@ -787,7 +802,7 @@ Token* scanner_loop_string(FA dfa, char* src, int* ignore_cats, int amount_ignor
     return token_list;
 }
 
-FA MakeFA(char *src, bool debug){
+FA MakeFA(char *src, char* out_dir, bool debug){
     if(debug){
         printf("\ninitializing non finite automata...\n");
     }
@@ -818,6 +833,16 @@ FA MakeFA(char *src, bool debug){
         printf("DFA -> \n");
         FA_print(dfa);
     }
+
+    FILE* out = fopen(out_dir, "w");
+
+    fprintf(out, "--- Post Regex ---\n");
+    fprintf(out, "%s\n", regex);
+    fprintf(out, "\nNFA -> \n");
+    FA_export(nfa, out);
+    fprintf(out, "\nDFA -> \n");
+    FA_export(dfa, out);
+    fclose(out);
 
     return dfa;
 }

@@ -1,7 +1,7 @@
 #include <stdbool.h>  // For bool type
 #include <stddef.h>   // For size_t
 
-#define MAX_REG 256
+#define MAX_REG 512
 
 // Enum for character classification
 enum CharClass {

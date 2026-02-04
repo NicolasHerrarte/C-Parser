@@ -1,5 +1,7 @@
 #include <stdlib.h>
-#include <string.h>  
+#include <string.h> 
+#include <stdio.h>
+
 #include "subset.h"
 
 
@@ -44,8 +46,13 @@ typedef struct Fragment{
 
 void print_transition(Transition t);
 void FA_print(FA fa);
-void states_print(int* states);
 void print_token_seq(Token* tokens);
+
+void export_transition(Transition t, FILE* out);
+void FA_export(FA fa, FILE* out);
+void export_token_seq(Token* tokens, FILE* out);
+
+void states_print(int* states);
 
 int FA_initialize(FA *fa);
 int FA_next_state(FA *fa);
@@ -78,5 +85,5 @@ FA NtoDFA(FA nfa);
 Token* scanner_loop_file(FA dfa, char* directory, int* ignore_cats, int amount_ignore);
 Token* scanner_loop_string(FA dfa, char* src, int* ignore_cats, int amount_ignore);
 
-FA MakeFA(char *src, bool debug);
+FA MakeFA(char *src, char* out_dir, bool debug);
 
