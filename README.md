@@ -1,6 +1,7 @@
 # LR(1) Parser & Grammar Processor
+It is still in testing phase so I would not use it for production
 
-A robust, high-performance **LR(1) Parser Generator and Syntax Analyzer** written in C. This system automates the transition from formal grammar specifications to concrete syntax trees, utilizing advanced lookahead propagation and state-machine generation.
+**LR(1) Parser Generator and Syntax Analyzer** written in C. This system automates the transition from formal grammar specifications to concrete syntax trees, utilizing advanced lookahead propagation and state-machine generation.
 
 ## Key Features
 
@@ -16,7 +17,7 @@ A robust, high-performance **LR(1) Parser Generator and Syntax Analyzer** writte
 
 ## Architecture Overview
 
-Designed for compiler front-ends requiring rigorous formal verification, this implementation takes production rules and source files as input to produce a hierarchical Parse Tree.
+Utilizes LR(1) parsing which is designed for compiler front-ends for minimal ambiguity, this implementation takes production rules and source files as input to produce a hierarchical Parse Tree.
 
 ### Technical Specifications
 | Component | Implementation Detail |
