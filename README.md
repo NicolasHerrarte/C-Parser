@@ -181,7 +181,6 @@ Program
                     └── for
 ```
 
-Markdown
 # Lexical Specification and Grammar Rules
 
 This document outlines the token definitions, grammar lexer rules, and the program structure for the compiler/interpreter.
