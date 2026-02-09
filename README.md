@@ -181,71 +181,7 @@ Program
                     └── for
 ```
 
-# Lexical Specification and Grammar Rules
-
-This document outlines the token definitions, grammar lexer rules, and the program structure for the compiler/interpreter.
-
-## 1. Language Tokens
-These tokens define the core syntax for the source code.
-
-| Pattern | Token ID | Description |
-|:---|:---|:---|
-| `==` | `$19` | Equals |
-| `>=` | `$20` | Greater than or equal |
-| `<=` | `$21` | Less than or equal |
-| `>` | `$22` | Greater than |
-| `<` | `$23` | Less than |
-| `+` | `$07` | Plus operator |
-| `-` | `$08` | Minus operator |
-| `/*` | `$09` | Block comment start |
-| `//` | `$10` | Inline comment |
-| `(` | `$11` | Left parenthesis |
-| `)` | `$12` | Right parenthesis |
-| `[` | `$15` | Left bracket |
-| `]` | `$16` | Right bracket |
-| `.` | `$17` | Dot |
-| `,` | `$18` | Comma |
-| `0 \| [1-9][0-9]*` | `$13` | Integer literal |
-| `"[a-zA-Z0-9_]*"` | `$24` | String literal |
-| `true` | `$25` | Boolean true |
-| `false` | `$26` | Boolean false |
-| `if` | `$32` | Conditional if |
-| `else` | `$33` | Conditional else |
-| `while` | `$34` | While loop |
-| `for` | `$35` | For loop |
-| `Init` | `$36` | Initialization keyword |
-| `Proc` | `$37` | Procedure keyword |
-| `return` | `$38` | Return keyword |
-| `{` | `$39` | Left brace |
-| `}` | `$40` | Right brace |
-| `;` | `$41` | Semicolon |
-| `<-` | `$42` | Assignment (Left) |
-| `=` | `$43` | Assignment (Equal) |
-| `:` | `$44` | Colon |
-| `->` | `$45` | Arrow operator |
-| `int` | `$46` | Type: Integer |
-| `bool` | `$47` | Type: Boolean |
-| `float` | `$48` | Type: Float |
-| `break` | `$49` | Break keyword |
-| `continue` | `$50` | Continue keyword |
-| `goto` | `$51` | Goto keyword |
-| `[a-zA-Z_][a-zA-Z0-9_]*` | `$14` | Identifier |
-| `( \n \t \r)+` | `$01` | Whitespace |
-
----
-
-## 2. Grammar Lexer Rules
-Rules used specifically for defining structural grammar.
-
-| Pattern | Token ID | Description |
-|:---|:---|:---|
-| `(([a-zA-Z/()/ */ / /-/ /[]+=?><.;{},:])+)+` | `$02` | Grammar Symbol / Terminal |
-| `\|` | `$03` | Grammar Choice (OR) |
-| `->` | `$04` | Production Arrow |
-| `;` | `$05` | Grammar Rule Terminator |
-
----
-
+## Lexical Specification and Grammar Rules
 
 ### Production Rules
 
@@ -263,7 +199,7 @@ Rules used specifically for defining structural grammar.
 | **Expr** | `Expr LoP Eval` \| `Eval` |
 | **Access** | `Access ( Args )` \| `Access . name` \| `AccessBase` |
 | **LoP** | `=?` \| `<` \| `>` |
-```
+
 
 ---
 
