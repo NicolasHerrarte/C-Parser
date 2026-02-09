@@ -18,6 +18,10 @@ TreeNode* tree_make_node(int amount_nodes, char* name, TreeNode** nodes){
 
     return new_node;
 }
+void tree_destroy_node(TreeNode* node){
+    free(node->children);
+    free(node);
+}
 
 void print_node_info(TreeNode* node) {
     if (node == NULL) {

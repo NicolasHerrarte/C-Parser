@@ -55,6 +55,7 @@ void export_token_seq(Token* tokens, FILE* out);
 void states_print(int* states);
 
 int FA_initialize(FA *fa);
+void FA_destroy(FA *fa);
 int FA_next_state(FA *fa);
 bool int_dynarray_in(int* arr, int search);
 bool FA_valid_state(FA fa, int state_check);
@@ -75,7 +76,7 @@ int parenthesis(Fragment fragment, Fragment *left_fragment, bool *final_split, b
 void print_safe_char(char c);
 Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state, bool recursion, bool debug);
 
-Subset e_closure(FA nfa, Subset states_closure);
+void e_closure(FA nfa, Subset* states_closure);
 Subset delta(FA nfa, Subset q, char c);
 
 int* NFA_transition_function(FA nfa, int state, char c);

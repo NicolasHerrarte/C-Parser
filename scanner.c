@@ -110,12 +110,16 @@ bool int_dynarray_in(int* arr, int search){
     return false;
 }
 
+void FA_destroy(FA *fa){
+    dynarray_destroy(fa->states);
+    dynarray_destroy(fa->transitions);
+    dynarray_destroy(fa->acceptable_states);
+}
 
 bool FA_valid_state(FA fa, int state_check){
     return int_dynarray_in(fa.states, state_check);
 }
 
-// Assumes states are ordered and without gaps: state[0] = 0, state[1] = 1, state[2] = 2 ...
 bool FA_fast_valid_state(FA fa, int state_check){
     return (state_check < dynarray_length(fa.states));
 }
@@ -433,11 +437,12 @@ Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state
     }
 }
 
-Subset e_closure(FA nfa, Subset states_closure){
-    int* states = SS_to_list_indexes(states_closure);
+// Because delta creates a subset from scratch there is no memory leak and no need to make a deep copy
+void e_closure(FA nfa, Subset* states_closure){
+    int* states = SS_to_list_indexes(*states_closure);
     int* inspect_states = dynarray_create(int);
 
-    for(int i = 0;i<states_closure.count;i++){
+    for(int i = 0;i<states_closure->count;i++){
         dynarray_push(inspect_states, states[i]);
     }
 
@@ -447,17 +452,16 @@ Subset e_closure(FA nfa, Subset states_closure){
         dynarray_pop(inspect_states, &n);
         for(int i = 0;i<dynarray_length(nfa.transitions);i++){
             if(nfa.transitions[i].state_from == n && nfa.transitions[i].trans_char == EPSILON){
-                if(!SS_in(states_closure, nfa.transitions[i].state_to)){
+                if(!SS_in(*states_closure, nfa.transitions[i].state_to)){
                     dynarray_push(inspect_states, nfa.transitions[i].state_to);
-                    SS_add(&states_closure, nfa.transitions[i].state_to);
+                    SS_add(states_closure, nfa.transitions[i].state_to);
                 }
             }
         }
     }
 
     dynarray_destroy(inspect_states);
-
-    return states_closure;
+    dynarray_destroy(states);
 }
 
 int* NFA_transition_function(FA nfa, int state, char c){
@@ -494,6 +498,8 @@ Subset delta(FA nfa, Subset q, char c){
         dynarray_destroy(state_transitions);
     }
 
+    dynarray_destroy(q_list);
+
     return delta_out;
 }
 
@@ -508,8 +514,8 @@ FA NtoDFA(FA nfa){
 
     char* alphabet_list = char_b_table_to_list(nfa.alphabet);
 
-    Subset n0 = SS_initialize(len_nfa_states(nfa), &nfa.initial_state, 1);
-    Subset q0 = e_closure(nfa, n0);
+    Subset q0 = SS_initialize(len_nfa_states(nfa), &nfa.initial_state, 1);
+    e_closure(nfa, &q0);
     
     Subset* Q = dynarray_create(Subset);
     Subset** T = dynarray_create(Subset*);
@@ -529,7 +535,9 @@ FA NtoDFA(FA nfa){
 
         for(int i = 0;i<alphabet_length; i++){
             char c = alphabet_list[i];
-            Subset t = e_closure(nfa, delta(nfa, q, c));
+
+            Subset t = delta(nfa, q, c);
+            e_closure(nfa, &t);
 
             q_slot[i] = t;
             //printf("Char %c\n", c);
@@ -542,6 +550,8 @@ FA NtoDFA(FA nfa){
             }
         }
     }
+
+    dynarray_destroy(worklist);
 
     FA dfa;
     FA_initialize(&dfa);
@@ -582,6 +592,16 @@ FA NtoDFA(FA nfa){
             }
         }
     }
+
+    for(int i = 0;i<dynarray_length(T);i++){
+        for(int j = 0;j<alphabet_length;j++){
+            SS_destroy(&(T[i][j]));
+        }
+        free(T[i]);
+    }
+
+    dynarray_destroy(T);
+    dynarray_destroy(Q);
 
     return dfa;
 }
@@ -843,6 +863,9 @@ FA MakeFA(char *src, char* out_dir, bool debug){
     fprintf(out, "\nDFA -> \n");
     FA_export(dfa, out);
     fclose(out);
+
+    FA_destroy(&nfa);
+    dynarray_destroy(regex);
 
     return dfa;
 }

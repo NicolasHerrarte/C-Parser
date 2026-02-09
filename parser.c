@@ -97,7 +97,6 @@ void export_transition_list(LRTransition* transitions, char** symbol_names, FILE
     
     fprintf(out, "\n=== LR(1) Transition Table (%d entries) ===\n", count);
     for (int i = 0; i < count; i++) {
-        // Accessing and passing the object by value
         export_transition_single(transitions[i], symbol_names, out);
     }
     fprintf(out, "============================================\n");
@@ -108,7 +107,6 @@ void print_transition_list(LRTransition* transitions, char** symbol_names) {
     
     printf("\n=== LR(1) Transition Table (%d entries) ===\n", count);
     for (int i = 0; i < count; i++) {
-        // Accessing and passing the object by value
         print_transition_single(transitions[i], symbol_names);
     }
     printf("============================================\n");
@@ -121,8 +119,6 @@ void print_transitions(LRTransition* transitions, int count, char** symbol_names
     for (int i = 0; i < count; i++) {
         LRTransition t = transitions[i];
         
-        // Determine if it's a Terminal (Shift) or Non-Terminal (Goto)
-        // This assumes your symbol mapping puts Terminals first
         const char* type = (t.trans_symbol < num_terminals) ? "SHIFT" : "GOTO";
 
         printf("State %-6d | %-15s | State %-7d | %-10s\n", 
@@ -272,9 +268,9 @@ int get_rhs_width(Item item, char** index_mapping) {
     int width = 0;
     int len = dynarray_length(*item.beta);
     for (int i = 0; i < len; i++) {
-        width += strlen(index_mapping[(*item.beta)[i]]) + 1; // +1 for the space
+        width += strlen(index_mapping[(*item.beta)[i]]) + 1;
     }
-    // Add 1 for the '*' character
+
     return width + 1; 
 }
 
@@ -405,6 +401,19 @@ Production create_production(int a, int* b, int b_count){
     return production;
 }
 
+Production destroy_production(Production* production){
+    dynarray_destroy(production->beta);
+}
+
+void destroy_grammar(Grammar* G){
+    dynarray_destroy(G->T);
+    dynarray_destroy(G->NT);
+    for(int i = 0;i<dynarray_length(G->productions);i++){
+        destroy_production(&(G->productions[i]));
+    }
+    dynarray_destroy(G->productions);
+}
+
 Subset* generate_first(Grammar G){
     int symbols_length = dynarray_length(G.T)+dynarray_length(G.NT);
     Subset* first = malloc(symbols_length*sizeof(Subset));
@@ -463,6 +472,14 @@ Subset* generate_first(Grammar G){
     }
     while(changed == true);
     return first;
+}
+
+void destroy_first(Grammar G, Subset* first){
+    int symbols_length = dynarray_length(G.T)+dynarray_length(G.NT);
+    for(int i = 0;i<symbols_length;i++){
+        SS_destroy(&first[i]);
+    }
+    free(first);
 }
 
 
@@ -590,7 +607,11 @@ Item* goto_table(Grammar G, Item* s, Subset* first, int x){
         }
     }
 
-    return item_closure(G, moved, first);
+    Item* closure = item_closure(G, moved, first);
+    // FUCK
+    dynarray_destroy(moved);
+
+    return closure;
 }
 
 TableMaterial c_collection(Grammar G, Subset* first){
@@ -605,6 +626,9 @@ TableMaterial c_collection(Grammar G, Subset* first){
 
     CC_Item cc0;
     cc0.cc = item_closure(G, s, first);
+    
+    dynarray_destroy(s);
+
     cc0.marked = false;
     cc0.state = 0;
 
@@ -680,6 +704,8 @@ TableMaterial c_collection(Grammar G, Subset* first){
         //printf("---\n");
         //print_transition(trans[i]);
     //}
+
+    hash_destroy(HCC);
 
     TableMaterial fout;
     fout.CC = CC;
@@ -804,6 +830,8 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
         }
     }
 
+    SS_destroy(&counted);
+
     //printf("--- Counts ---\n");
     //printf("T: %d, NT: %d\n", t_count, nt_count);
     //printf("--- Actions ---\n");
@@ -838,6 +866,8 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
             table_goto[curr_trans.state_from][symbols_mapping[curr_trans.trans_symbol]] = curr_trans.state_to;
         }
     }
+
+    SS_destroy(&fast_terminal);
 
     for(int i=0;i<dynarray_length(tb.CC);i++){
         for(int j=0;j<dynarray_length(tb.CC[i].cc);j++){
@@ -874,6 +904,12 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
             }
         }
     }
+
+    dynarray_destroy(tb.goto_transitions);
+    for(int i = 0;i<dynarray_length(tb.CC);i++){
+        dynarray_destroy(tb.CC[i].cc);
+    }
+    dynarray_destroy(tb.CC);
     
     TableMapping t_mapping;
     t_mapping.table_action = table_action;
@@ -886,6 +922,29 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     t_mapping.symbols_mapping = symbols_mapping;
 
     return t_mapping;
+}
+
+
+void destroy_tables(TableMapping t_mapping){
+    for(int i=0;i<t_mapping.states_count;i++){
+        for(int j=0;j<t_mapping.t_count;j++){
+            free(t_mapping.table_action[i][j]);
+        }
+        free(t_mapping.table_action[i]);
+    }
+
+    free(t_mapping.table_action);
+
+    for(int i=0;i<t_mapping.states_count;i++){
+        free(t_mapping.table_goto[i]);
+    }
+
+    free(t_mapping.table_goto);
+
+    free(t_mapping.symbols_mapping);
+
+    dynarray_destroy(t_mapping.action_mapping);
+    dynarray_destroy(t_mapping.goto_mapping);
 }
 
 void print_stack(StackItem* stack, char** index_mapping) {
@@ -932,7 +991,7 @@ char** storage_table_from_mapping(Pair* mapping, int map_size){
 
 TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters, char** index_mapping){
 
-    StackItem* stack = dynarray_create_prealloc(StackItem,100);
+    StackItem* stack = dynarray_create(StackItem);
     //StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
 
     StackItem first_node;
@@ -1053,7 +1112,9 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
     } while(true);
 
     TreeNode* root = (TreeNode*) stack[DEFAULT_STACK_SIZE+extra_parameters].s_ptr;
-    //free(first_node.s_ptr);
+
+    dynarray_destroy(stack);
+    tree_destroy_node(first_node.s_ptr);
 
     return root;
 }
@@ -1064,7 +1125,9 @@ bool int_equal(void* a, void* b) {
 
 Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out){
     int ignore_categories[] = {1};
-    Token* token = scanner_loop_file(rules_regex, file_lexing_rules, ignore_categories, 1);
+    Token* token_anchor = scanner_loop_file(rules_regex, file_lexing_rules, ignore_categories, 1);
+    Token* token = token_anchor;
+
     export_token_seq(token, out);
 
     Grammar G = create_grammar();
@@ -1077,6 +1140,7 @@ Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping
     while(token->category != 0){
         if(state == 0 && token->category == 2){
             int* pointer_get = dynadict_get(dict_mapping,token->word);
+            printf("word: %s \n", token->word);
             if(pointer_get == NULL){
                 printf("Rules Synthax Error\n");
             }
@@ -1128,199 +1192,14 @@ Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping
     G.NT = SS_to_list_indexes(non_terminals_ss);
     G.T = SS_to_list_indexes(terminals_ss);
 
+    SS_destroy(&non_terminals_ss);
+    SS_destroy(&terminals_ss);
+
+    dynarray_destroy(token_anchor);
+
     return G;
 }
 
-
-int main1() {
-    printf("Parser...\n");
-
-    Pair mapping[] = {
-        {"End",             0},
-        {"Epsilon",         1},
-        {"Goal",            2},
-        {"Expr",            3},
-        {"Eval",            4},
-        {"Term",            5},
-        {"Factor",          6},
-        {"+",               7},
-        {"-",               8},
-        {"*",               9},
-        {"/",               10},
-        {"(",               11},
-        {")",               12},
-        {"num",             13},
-        {"name",            14},
-        {"[",               15},
-        {"]",               16},
-        {".",               17},
-        {",",               18},
-        {"=?",              19},
-        {">=",              20},
-        {"<=",              21},
-        {">",               22},
-        {"<",               23},
-        {"string",          24},
-        {"true",            25},
-        {"false",           26},
-        {"Access",          27},
-        {"AccessBase",      28},
-        {"LoP",             29},
-        {"Args",            30},
-        {"ArgList",         31},
-        {"if",              32}, 
-        {"else",            33},
-        {"while",           34},
-        {"for",             35},
-        {"Init",            36},
-        {"Proc",            37},
-        {"return",          38},
-        {"{",               39},
-        {"}",               40},
-        {";",               41},
-        {"<-",              42},
-        {"=",               43},
-        {":",               44},
-        {"->",              45},
-        {"int",             46},
-        {"bool",            47},
-        {"float",           48},
-        {"break",           49},
-        {"continue",        50},
-        {"goto",            51},
-        {"Program",         52},
-        {"Block",           53},
-        {"CompStat",        54},
-        {"UnitStat",        55},
-        {"ControlStat",     56},
-        {"Stat",            57},
-        {"CondStat",        58},
-        {"LoopStat",        59},
-        {"While",           60},
-        {"For",             61},
-        {"Declaration",     62},
-        {"ProcDeclaration", 63},
-        {"Assignment",      64},
-        {"VarType",         65},
-        {"Primitive",       66},
-        {"Jump",            67},
-        {"Params",          68},
-        {"ParamsList",      69}
-    };
-
-    int symbols_amount = 70;
-
-    Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
-    char** value_map = storage_table_from_mapping(mapping, symbols_amount);
-
-    char* prod_rules_src = "grammar.k.specs";
-    
-    char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])*)$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
-    FA rules_regex = MakeFA(re_rules, "output/rules_dfa.txt", true);
-
-
-    FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
-
-    Grammar G = build_grammar(rules_regex, prod_rules_src, dict_map, symbols_amount, file_rules_seq );
-    fclose(file_rules_seq);
-
-
-    print_grammar(G, value_map);
-
-    FILE* file_grammar = fopen("output/grammar.txt", "w");
-
-    export_grammar(G, value_map, file_grammar);
-    fclose(file_grammar);
-
-    Subset* first = generate_first(G);
-
-    print_first_sets(G, first, value_map);
-    FILE* file_first = fopen("output/first_sets.txt", "w");
-
-    export_first_sets(G, first, value_map, file_first);
-    fclose(file_first);
-    
-    
-    //Item initial_item;
-    //initial_item.alpha = GOAL;
-    //int* master_beta = dynarray_create(int);
-    //initial_item.beta = &master_beta;
-    //dynarray_push_rval(*initial_item.beta, LIST);
-    //initial_item.lookahead = END;
-    //initial_item.k = 0;
-
-    //Item* s = dynarray_create(Item);
-    //dynarray_push(s, initial_item);
-    //Item* c = item_closure(G, s, first);
-    //print_item_list(c, value_map, "closure");
-    //Item* g = goto_table(G, c, first, LEFT_PAR);
-    //print_item_list(g, value_map, "goto");
-    //printf("Moment of Truth\n");
-
-    TableMaterial table_material = c_collection(G, first);
-
-    print_canonical_collection(table_material.CC, value_map);
-    print_transition_list(table_material.goto_transitions, value_map);
-
-    FILE* file_collection = fopen("output/collection.txt", "w");
-
-    export_canonical_collection(table_material.CC, value_map, file_collection);
-    fprintf(file_collection, "\n\n\n");
-    export_transition_list(table_material.goto_transitions, value_map, file_collection);
-    fclose(file_collection);
-
-    
-    //CC_Item* CC = table_material.CC;
-    //LRTransition* trans = table_material.goto_transitions;
-
-    //for(int i = 0;i<dynarray_length(CC);i++){
-        //printf("---\n");
-        //for(int j = 0;j<dynarray_length(CC[i].cc);j++){
-            //print_item(CC[i].cc[j]);
-        //}
-        //printf("---\n");
-    //}
-
-    //for(int i = 0;i<dynarray_length(trans);i++){
-        ///printf("---\n");
-        //print_transition(trans[i]);
-    //}
-
-    TableMapping tables_info = create_tables(G, table_material);
-    print_tables(&tables_info);
-
-    FILE* file_tables = fopen("output/parser_tables.txt", "w");
-
-    export_tables(&tables_info, file_tables);
-    fclose(file_tables);
-
-    char* file_dir = "languaje.k";
-
-    //char* lexing_rules = "(=?)$18|(>=)$19|(<=)$20|(>)$21|(<)$22|+$06|-$07|/*$08|//$09|/($10|/)$11|/[$14|/]$15|.$16|,$17|(0|[1-9][0-9]*)$12|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$23|(true)$24|(false)$25|(if)$32|(else)$33|(while)$34|(for)$35|(Init)$36|(Proc)$37|(return)$38|([a-zA-Z_][a-zA-Z0-9_]*)$13|(( |\n|\t|\r)( |\n|\t|\r)*)$31";
-
-    char* lexing_rules = "(=?)$19|(>=)$20|(<=)$21|(>)$22|(<)$23|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$15|/]$16|.$17|,$18|(0|[1-9][0-9]*)$13|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$24|(true)$25|(false)$26|(if)$32|(else)$33|(while)$34|(for)$35|(Init)$36|(Proc)$37|(return)$38|({)$39|(})$40|(;)$41|(<-)$42|(=)$43|(:)$44|(->)$45|(int)$46|(bool)$47|(float)$48|(break)$49|(continue)$50|(goto)$51|([a-zA-Z_][a-zA-Z0-9_]*)$14|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
-
-    int ignore_categories[] = {1};
-
-    
-    FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
-
-    Token* scanner_out = scanner_loop_file(lexing_rules_regex, file_dir, ignore_categories, 1);
-    print_token_seq(scanner_out);
-
-    FILE* file_lexer_seq = fopen("output/lexer_seq.txt", "w");
-
-    export_token_seq(scanner_out, file_lexer_seq);
-    fclose(file_lexer_seq);
-
-    return 0;
-
-    TreeNode* root = parser_skeleton(G, tables_info, scanner_out, 0, value_map);
-    printf("\n--- Parse Tree ---\n");
-    print_tree(root, "", true, true);
-
-    return 0;
-}
 
 int main(){
     printf("Parser...\n");
@@ -1418,6 +1297,8 @@ int main(){
     export_grammar(G, value_map, file_grammar);
     fclose(file_grammar);
 
+    FA_destroy(&rules_regex);
+
     // --- 3. FIRST SETS GENERATION ---
     Subset* first = generate_first(G);
     
@@ -1428,6 +1309,8 @@ int main(){
 
     // --- 4. CANONICAL COLLECTION & TRANSITIONS ---
     TableMaterial table_material = c_collection(G, first);
+
+    destroy_first(G, first);
 
     print_canonical_collection(table_material.CC, value_map);
     print_transition_list(table_material.goto_transitions, value_map);
@@ -1441,6 +1324,7 @@ int main(){
     // --- 5. LR(1) TABLE MAPPING ---
     TableMapping tables_info = create_tables(G, table_material);
     
+    
     print_tables(&tables_info);
     FILE* file_tables = fopen("output/parser_tables.txt", "w");
     export_tables(&tables_info, file_tables);
@@ -1453,7 +1337,9 @@ int main(){
 
     FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
     Token* scanner_out = scanner_loop_file(lexing_rules_regex, file_dir, ignore_categories, 1);
-    
+
+    FA_destroy(&lexing_rules_regex);
+
     print_token_seq(scanner_out);
     FILE* file_lexer_seq = fopen("output/lexer_seq.txt", "w");
     export_token_seq(scanner_out, file_lexer_seq);
@@ -1461,6 +1347,12 @@ int main(){
 
     // --- 7. PARSER EXECUTION ---
     TreeNode* root = parser_skeleton(G, tables_info, scanner_out, 0, value_map);
+
+    dynarray_destroy(scanner_out);
+    destroy_tables(tables_info);
+    free(value_map);
+    dynadict_destroy(dict_map);
+
     if (root) {
         printf("\n--- Parse Tree ---\n");
         print_tree(root, "", true, true);

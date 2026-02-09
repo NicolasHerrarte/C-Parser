@@ -12,3 +12,4 @@ typedef struct TreeNode{
 TreeNode* tree_make_node(int amount_nodes, char* name, TreeNode** nodes);
 void print_tree(TreeNode* node, char* prefix, bool is_last, bool is_root);;
 void print_node_info(TreeNode* node);
+void tree_destroy_node(TreeNode* node);

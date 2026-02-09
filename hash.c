@@ -132,6 +132,28 @@ void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), bo
     return NULL;
 }
 
+void _hash_destroy(Hash *hash, bool uses_key_storage){
+    for(int i=0;i<hash->capacity;i++){
+        Node* slot = hash->table[i];
+        if(slot != NULL){
+            Node* tmp = slot;
+            Node* prev = NULL;
+
+            while(tmp != NULL){
+                prev = tmp;
+                tmp = tmp->next;
+                free(prev);
+            }
+        }
+    }
+    free(hash->table);
+    dynarray_destroy(hash->obj_storage);
+    if(uses_key_storage){
+        dynarray_destroy(hash->key_storage);
+    }
+    dynarray_destroy(hash->holes);
+}
+
 void *_hash_to_list(Hash *hash){
     void* arr = _dynarray_create(hash->count, hash->stride);
     for(int i=0;i<hash->capacity;i++){

@@ -3,11 +3,13 @@
 #include <stdint.h>
 
 #define hash_create(node_amount, type, ptr_func) _hash_create(node_amount, sizeof(type), sizeof(type), ptr_func, false)
+#define hash_destroy(hash) _hash_destroy(&hash, false)
 #define hash_in(hash, xptr, func) _hash_in(&hash, &xptr, &xptr, func, 0, false)
 #define hash_add(hash, xptr, func) _hash_in(&hash, &xptr, &xptr, func, 1, false)
 #define hash_remove(hash, xptr, func) _hash_in(&hash, &xptr, &xptr, func, -1, false)
 #define hash_get(hash, xptr, func) _hash_get(&hash, &xptr, func, false)
 
+#define dynadict_destroy(hash) _hash_destroy(&hash, true)
 #define dynadict_create(node_amount, type) _hash_create(node_amount, sizeof(type), sizeof(char*), _djb33_hash, true)
 #define dynadict_key_in(hash, xptr) _hash_in(&hash, &xptr, &xptr, string_equal, 0, true)
 #define dynadict_add(hash, xptr, stptr) _hash_in(&hash, &xptr, &stptr, string_equal, 1, true)
@@ -37,6 +39,7 @@ typedef struct Hash{
 } Hash;
 
 Hash _hash_create(int node_amount, size_t stride, size_t key_stride, void* ptr_func, bool uses_key_storage);
+void _hash_destroy(Hash *hash, bool uses_key_storage);
 bool _hash_in(Hash *hash, void *xptr, void *str_ptr, bool (*f_equality_ptr)(void*, void*), int action, bool uses_key_storage);
 void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), bool uses_key_storage);
 void *_hash_to_list(Hash *hash);
