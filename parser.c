@@ -784,9 +784,200 @@ void export_tables(TableMapping* tm, FILE* out) {
     fprintf(out, "\n");
 }
 
+void save_parsing_tables(TableMapping* tm, char* directory){
+    FILE* f = fopen(directory, "w");
+    assert(f != NULL);
+
+    fprintf(f, "%d, %d, %d\n\n", tm->t_count, tm->nt_count, tm->states_count);
+
+    for (int j = 0; j < tm->t_count; j++) {
+        fprintf(f, "T%d, ", tm->action_mapping[j]);
+    }
+    for (int j = 0; j < tm->nt_count; j++) {
+        fprintf(f, "N%d, ", tm->goto_mapping[j]);
+    }
+    fprintf(f, "\n");
+
+    for (int i = 0; i < tm->states_count; i++) {
+
+        for (int j = 0; j < tm->t_count; j++) {
+            int action_type = tm->table_action[i][j][0]; 
+            int action_val  = tm->table_action[i][j][1];
+
+            if (action_type == 2) {
+                fprintf(f, "s%d, ", action_val);
+            } else if (action_type == 1) {
+                fprintf(f, "a0, ");
+            } else if (action_val == 3) {
+                fprintf(f, "r%d, ", action_type + 1); 
+            } else {
+                fprintf(f, "e0, ");
+            }
+        }
+
+        for (int j = 0; j < tm->nt_count; j++) {
+            int state_to = tm->table_goto[i][j];
+            if (state_to != -1) {
+                fprintf(f, "g%d, ", state_to);
+            } else {
+                fprintf(f, "e0, ");
+            }
+        }
+        fprintf(f, "\n");
+    }
+
+    fprintf(f, "\n");
+
+    for(int i = 0;i<tm->t_count;i++){
+        fprintf(f, "%d, ", tm->action_mapping[i]);
+    }
+
+    fprintf(f, "\n");
+
+    for(int i = 0;i<tm->nt_count;i++){
+        fprintf(f, "%d, ", tm->goto_mapping[i]);
+    }
+
+    fprintf(f, "\n");
+
+    for(int i = 0;i<tm->t_count + tm->nt_count;i++){
+        fprintf(f, "%d, ", tm->symbols_mapping[i]);
+    }
+
+    fclose(f);
+}
+
+TableMapping load_parsing_tables(char* directory){
+    FILE* f = fopen(directory, "r");
+    assert(f != NULL);
+
+    TableMapping tm;
+
+    fscanf(f, "%d, %d, %d", &tm.t_count, &tm.nt_count, &tm.states_count);
+
+    int* symbols_mapping = malloc((tm.t_count+tm.nt_count) * sizeof(int));
+    memset(symbols_mapping, -1, (tm.t_count+tm.nt_count) * sizeof(int));
+    int* action_mapping = dynarray_create(int);
+    int* goto_mapping = dynarray_create(int);
+
+    int*** table_action = malloc(tm.states_count * sizeof(int**));
+    for(int i=0;i<tm.states_count;i++){
+        table_action[i] = calloc(tm.t_count, sizeof(int*));
+        for(int j=0;j<tm.t_count;j++){
+            table_action[i][j] = calloc(2, sizeof(int));
+        }
+    }
+
+    int** table_goto = malloc(tm.states_count * sizeof(int*));
+    for(int i=0;i<tm.states_count;i++){
+        table_goto[i] = malloc(tm.nt_count * sizeof(int));
+        memset(table_goto[i], -1, tm.nt_count * sizeof(int));
+    }
+
+    for(int i = 0;i<tm.t_count;i++){
+        char action_type_mapping; 
+        int action_val_mapping;
+        
+        fscanf(f, " %c%d,", &action_type_mapping, &action_val_mapping);
+
+        if(action_type_mapping == 'T'){
+            action_mapping[i] = action_val_mapping; 
+        }
+        else{
+            printf("Table Reading Error %c\n", action_type_mapping);
+            assert(false);
+        }
+    }
+
+    for(int i = 0;i<tm.nt_count;i++){
+        char goto_type_mapping; 
+        int goto_val_mapping;
+        
+        fscanf(f, " %c%d,", &goto_type_mapping, &goto_val_mapping);
+
+        if(goto_type_mapping == 'N'){
+            goto_mapping[i] = goto_val_mapping; 
+        }
+        else{
+            printf("Table Reading Error %c\n", goto_type_mapping);
+            assert(false);
+        }
+    }
+
+    for(int i = 0;i<tm.states_count;i++){
+        for(int j = 0;j<tm.t_count;j++){
+            char action_type; 
+            int action_val;
+            
+            fscanf(f, " %c%d,", &action_type, &action_val);
+            printf("Type -> %c Val -> %d\n", action_type, action_val);
+
+            if(action_type == 'e'){
+                continue;
+            }
+            else if(action_type == 's'){
+                table_action[i][j][0] = 2;
+                table_action[i][j][1] = action_val;
+            }
+            else if(action_type == 'r'){
+                table_action[i][j][0] = 3;
+                table_action[i][j][1] = action_val;
+            }
+            else if(action_type == 'a'){
+                table_action[i][j][0] = 1;
+            }
+            else{
+                printf("Table Reading Error %c\n", action_type);
+                assert(false);
+            }
+        }
+        
+        for(int j = 0;j<tm.nt_count;j++){
+            char goto_type; 
+            int goto_val;
+            fscanf(f, " %c%d,", &goto_type, &goto_val);
+
+            if(goto_type == 'e'){
+                continue;
+            }
+            else if(goto_type == 'g'){
+                table_goto[i][j] = goto_val;
+            }
+            else{
+                printf("Table Reading Error %c\n", goto_type);
+                assert(false);
+            }
+        }
+    }
+
+    int garbage;
+    for(int i = 0;i<tm.t_count;i++){
+        
+        fscanf(f, " %d,", &garbage);
+    }
+
+    for(int i = 0;i<tm.nt_count;i++){
+        fscanf(f, " %d,", &garbage);
+    }
+
+    for(int i = 0;i<tm.t_count + tm.nt_count;i++){
+        fscanf(f, " %d,", &tm.symbols_mapping[i]);
+        printf("plz %i\n", tm.symbols_mapping[i]);
+    }
+
+    tm.action_mapping = action_mapping;
+    tm.goto_mapping = goto_mapping;
+    tm.symbols_mapping = symbols_mapping;
+    tm.table_action = table_action;
+    tm.table_goto = table_goto;
+
+    return tm;
+}
+
 void print_tables(TableMapping* tm) {
     export_tables(tm, stdout);
 }
+
 
 TableMapping create_tables(Grammar G, TableMaterial tb){
     int t_length = dynarray_length(G.T);
@@ -796,6 +987,7 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     Subset fast_terminal = SS_initialize(t_length+nt_length, G.T,t_length);
     Subset counted = SS_initialize_empty(t_length+nt_length);
     int* symbols_mapping = malloc((t_length+nt_length) * sizeof(int));
+    memset(symbols_mapping, -1, (t_length+nt_length) * sizeof(int));
     int* action_mapping = dynarray_create(int);
     int* goto_mapping = dynarray_create(int);
     
@@ -1167,6 +1359,7 @@ Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping
                 printf("Rules Synthax Error\n");
                 printf("Word Unrecognized: %s\n", token->word);
             }
+            
             assert(pointer_get != NULL);
             int b_word_class = *pointer_get;
             dynarray_push(beta_memory, b_word_class);
@@ -1200,6 +1393,56 @@ Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping
     return G;
 }
 
+Grammar tables_pipeline(Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules) {
+    // --- 1. INITIALIZATION ---
+    Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
+    char** value_map = storage_table_from_mapping(mapping, symbols_amount);
+
+    // --- 2. GRAMMAR CONSTRUCTION ---
+    FA rules_regex = MakeFA(re_rules, "output/rules_dfa.txt", true);
+    FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
+    
+    Grammar G = build_grammar(rules_regex, prod_rules_src, dict_map, symbols_amount, file_rules_seq);
+    if (file_rules_seq) fclose(file_rules_seq);
+    FA_destroy(&rules_regex);
+
+    // Export Grammar
+    FILE* file_grammar = fopen("output/grammar.txt", "w");
+    if (file_grammar) {
+        export_grammar(G, value_map, file_grammar);
+        fclose(file_grammar);
+    }
+
+    // --- 3. FIRST SETS GENERATION ---
+    Subset* first = generate_first(G);
+    
+    FILE* file_first = fopen("output/first_sets.txt", "w");
+    if (file_first) {
+        export_first_sets(G, first, value_map, file_first);
+        fclose(file_first);
+    }
+
+    // --- 4. CANONICAL COLLECTION & TRANSITIONS ---
+    TableMaterial table_material = c_collection(G, first);
+    destroy_first(G, first);
+
+    FILE* file_collection = fopen("output/collection.txt", "w");
+    if (file_collection) {
+        export_canonical_collection(table_material.CC, value_map, file_collection);
+        fprintf(file_collection, "\n\n\n");
+        export_transition_list(table_material.goto_transitions, value_map, file_collection);
+        fclose(file_collection);
+    }
+
+    // --- 5. LR(1) TABLE MAPPING ---
+    TableMapping tables_info = create_tables(G, table_material);
+    
+    // Final Export/Save
+    save_parsing_tables(&tables_info, "tables/text_tables.txt");
+
+    return G;
+}
+
 
 int main(){
     printf("Parser...\n");
@@ -1218,66 +1461,67 @@ int main(){
         {"/",               10},
         {"(",               11},
         {")",               12},
-        {"num",             13},
-        {"name",            14},
-        {"[",               15},
-        {"]",               16},
-        {".",               17},
-        {",",               18},
-        {"=?",              19},
-        {">=",              20},
-        {"<=",              21},
-        {">",               22},
-        {"<",               23},
-        {"string",          24},
-        {"true",            25},
-        {"false",           26},
-        {"Access",          27},
-        {"AccessBase",      28},
-        {"LoP",             29},
-        {"Args",            30},
-        {"ArgList",         31},
-        {"if",              32}, 
-        {"else",            33},
-        {"while",           34},
-        {"for",             35},
-        {"Init",            36},
-        {"Proc",            37},
-        {"return",          38},
-        {"{",               39},
-        {"}",               40},
-        {";",               41},
-        {"<-",              42},
-        {"=",               43},
-        {":",               44},
-        {"->",              45},
-        {"int",             46},
-        {"bool",            47},
-        {"float",           48},
-        {"break",           49},
-        {"continue",        50},
-        {"goto",            51},
-        {"Program",         52},
-        {"Block",           53},
-        {"CompStat",        54},
-        {"UnitStat",        55},
-        {"ControlStat",     56},
-        {"Stat",            57},
-        {"CondStat",        58},
-        {"LoopStat",        59},
-        {"While",           60},
-        {"For",             61},
-        {"Declaration",     62},
-        {"ProcDeclaration", 63},
-        {"Assignment",      64},
-        {"VarType",         65},
-        {"Primitive",       66},
-        {"Jump",            67},
-        {"Params",          68},
-        {"ParamsList",      69}
+        {"integer",         13},
+        {"float",           14},
+        {"name",            15},
+        {"[",               16},
+        {"]",               17},
+        {".",               18},
+        {",",               19},
+        {"=?",              20},
+        {">=",              21},
+        {"<=",              22},
+        {">",               23},
+        {"<",               24},
+        {"string",          25},
+        {"true",            26},
+        {"false",           27},
+        {"Access",          28},
+        {"AccessBase",      29},
+        {"LoP",             30},
+        {"Args",            31},
+        {"ArgList",         32},
+        {"if",              33}, 
+        {"else",            34},
+        {"while",           35},
+        {"for",             36},
+        {"Init",            37},
+        {"Proc",            38},
+        {"return",          39},
+        {"{",               40},
+        {"}",               41},
+        {";",               42},
+        {"<-",              43},
+        {"=",               44},
+        {":",               45},
+        {"->",              46},
+        {"int",             47},
+        {"bool",            48},
+        {"float",           49},
+        {"break",           50},
+        {"continue",        51},
+        {"goto",            52},
+        {"Program",         53},
+        {"Block",           54},
+        {"CompStat",        55},
+        {"UnitStat",        56},
+        {"ControlStat",     57},
+        {"Stat",            58},
+        {"CondStat",        59},
+        {"LoopStat",        60},
+        {"While",           61},
+        {"For",             62},
+        {"Declaration",     63},
+        {"ProcDeclaration", 64},
+        {"Assignment",      65},
+        {"VarType",         66},
+        {"Primitive",       67},
+        {"Jump",            68},
+        {"Params",          69},
+        {"ParamsList",      70}
     };
 
-    int symbols_amount = 70;
+    int symbols_amount = 71;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
 
@@ -1329,10 +1573,13 @@ int main(){
     FILE* file_tables = fopen("output/parser_tables.txt", "w");
     export_tables(&tables_info, file_tables);
     fclose(file_tables);
+    save_parsing_tables(&tables_info, "tables/text_tables.txt");
+    TableMapping mp = load_parsing_tables("tables/text_tables.txt");
 
+    return 0;
     // --- 6. LEXER EXECUTION ---
     char* file_dir = "languaje.k";
-    char* lexing_rules = "(=?)$19|(>=)$20|(<=)$21|(>)$22|(<)$23|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$15|/]$16|.$17|,$18|(0|[1-9][0-9]*)$13|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$24|(true)$25|(false)$26|(if)$32|(else)$33|(while)$34|(for)$35|(Init)$36|(Proc)$37|(return)$38|({)$39|(})$40|(;)$41|(<-)$42|(=)$43|(:)$44|(->)$45|(int)$46|(bool)$47|(float)$48|(break)$49|(continue)$50|(goto)$51|([a-zA-Z_][a-zA-Z0-9_]*)$14|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(Init)$37|(Proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(break)$50|(continue)$51|(goto)$52|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     int ignore_categories[] = {1};
 
     FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
