@@ -784,6 +784,58 @@ void export_tables(TableMapping* tm, FILE* out) {
     fprintf(out, "\n");
 }
 
+#include <stdbool.h>
+#include <stdio.h>
+
+void assert_table_mappings_equal(TableMapping* a, TableMapping* b) {
+    // 1. Basic Pointer & Metadata Check
+    assert(a != NULL && b != NULL && "One of the TableMapping pointers is NULL");
+    
+    assert(a->states_count == b->states_count && "Mismatch in states_count");
+    assert(a->t_count      == b->t_count      && "Mismatch in terminal count (t_count)");
+    assert(a->nt_count     == b->nt_count     && "Mismatch in non-terminal count (nt_count)");
+
+    // 2. Compare 1D Mapping Arrays
+    for (int i = 0; i < a->t_count; i++) {
+        assert(a->action_mapping[i] == b->action_mapping[i] && "Mismatch in action_mapping values");
+    }
+    for (int i = 0; i < a->nt_count; i++) {
+        assert(a->goto_mapping[i] == b->goto_mapping[i] && "Mismatch in goto_mapping values");
+    }
+    
+    // Note: Assuming symbols_mapping size is t_count + nt_count
+    for (int i = 0; i < (a->t_count + a->nt_count); i++) {
+        assert(a->symbols_mapping[i] == b->symbols_mapping[i] && "Mismatch in symbols_mapping values");
+    }
+
+    // 3. Deep Compare table_action (int***)
+    // Structure based on your export logic: [state][terminal][type/value]
+    for (int i = 0; i < a->states_count; i++) {
+        for (int j = 0; j < a->t_count; j++) {
+            // Check the action type (e.g., Shift vs Reduce)
+            printf("Nums %d, %d\n", i, j);
+            printf("Vals %d, %d\n", a->table_action[i][j][0], b->table_action[i][j][0]);
+            assert(a->table_action[i][j][0] == b->table_action[i][j][0] && 
+                   "Mismatch in action_type at table_action[state][terminal][0]");
+            
+            // Check the action value (e.g., the state to shift to or the rule to reduce)
+            assert(a->table_action[i][j][1] == b->table_action[i][j][1] && 
+                   "Mismatch in action_val at table_action[state][terminal][1]");
+        }
+    }
+
+    // 4. Deep Compare table_goto (int**)
+    // Structure: [state][non-terminal]
+    for (int i = 0; i < a->states_count; i++) {
+        for (int j = 0; j < a->nt_count; j++) {
+            assert(a->table_goto[i][j] == b->table_goto[i][j] && 
+                   "Mismatch in GOTO value at table_goto[state][non-terminal]");
+        }
+    }
+
+    printf("Comparison Successful: Both TableMapping structs are identical.\n");
+}
+
 void save_parsing_tables(TableMapping* tm, char* directory){
     FILE* f = fopen(directory, "w");
     assert(f != NULL);
@@ -808,8 +860,8 @@ void save_parsing_tables(TableMapping* tm, char* directory){
                 fprintf(f, "s%d, ", action_val);
             } else if (action_type == 1) {
                 fprintf(f, "a0, ");
-            } else if (action_val == 3) {
-                fprintf(f, "r%d, ", action_type + 1); 
+            } else if (action_type == 3) {
+                fprintf(f, "r%d, ", action_val); 
             } else {
                 fprintf(f, "e0, ");
             }
@@ -857,8 +909,8 @@ TableMapping load_parsing_tables(char* directory){
 
     int* symbols_mapping = malloc((tm.t_count+tm.nt_count) * sizeof(int));
     memset(symbols_mapping, -1, (tm.t_count+tm.nt_count) * sizeof(int));
-    int* action_mapping = dynarray_create(int);
-    int* goto_mapping = dynarray_create(int);
+    int* action_mapping = dynarray_create_prealloc(int, tm.t_count);
+    int* goto_mapping = dynarray_create_prealloc(int, tm.nt_count);
 
     int*** table_action = malloc(tm.states_count * sizeof(int**));
     for(int i=0;i<tm.states_count;i++){
@@ -881,7 +933,7 @@ TableMapping load_parsing_tables(char* directory){
         fscanf(f, " %c%d,", &action_type_mapping, &action_val_mapping);
 
         if(action_type_mapping == 'T'){
-            action_mapping[i] = action_val_mapping; 
+            dynarray_push(action_mapping, action_val_mapping); 
         }
         else{
             printf("Table Reading Error %c\n", action_type_mapping);
@@ -896,7 +948,7 @@ TableMapping load_parsing_tables(char* directory){
         fscanf(f, " %c%d,", &goto_type_mapping, &goto_val_mapping);
 
         if(goto_type_mapping == 'N'){
-            goto_mapping[i] = goto_val_mapping; 
+            dynarray_push(goto_mapping, goto_val_mapping); 
         }
         else{
             printf("Table Reading Error %c\n", goto_type_mapping);
@@ -910,7 +962,7 @@ TableMapping load_parsing_tables(char* directory){
             int action_val;
             
             fscanf(f, " %c%d,", &action_type, &action_val);
-            printf("Type -> %c Val -> %d\n", action_type, action_val);
+            //printf("Type -> %c Val -> %d\n", action_type, action_val);
 
             if(action_type == 'e'){
                 continue;
@@ -950,6 +1002,7 @@ TableMapping load_parsing_tables(char* directory){
         }
     }
 
+
     int garbage;
     for(int i = 0;i<tm.t_count;i++){
         
@@ -961,9 +1014,12 @@ TableMapping load_parsing_tables(char* directory){
     }
 
     for(int i = 0;i<tm.t_count + tm.nt_count;i++){
-        fscanf(f, " %d,", &tm.symbols_mapping[i]);
-        printf("plz %i\n", tm.symbols_mapping[i]);
+        fscanf(f, " %d,", &symbols_mapping[i]);
+        //printf("plz %i\n", tm.symbols_mapping[i]);
     }
+
+    fclose(f);
+    
 
     tm.action_mapping = action_mapping;
     tm.goto_mapping = goto_mapping;
@@ -1393,27 +1449,7 @@ Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping
     return G;
 }
 
-Grammar tables_pipeline(Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules) {
-    // --- 1. INITIALIZATION ---
-    Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
-    char** value_map = storage_table_from_mapping(mapping, symbols_amount);
-
-    // --- 2. GRAMMAR CONSTRUCTION ---
-    FA rules_regex = MakeFA(re_rules, "output/rules_dfa.txt", true);
-    FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
-    
-    Grammar G = build_grammar(rules_regex, prod_rules_src, dict_map, symbols_amount, file_rules_seq);
-    if (file_rules_seq) fclose(file_rules_seq);
-    FA_destroy(&rules_regex);
-
-    // Export Grammar
-    FILE* file_grammar = fopen("output/grammar.txt", "w");
-    if (file_grammar) {
-        export_grammar(G, value_map, file_grammar);
-        fclose(file_grammar);
-    }
-
-    // --- 3. FIRST SETS GENERATION ---
+void tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules, char** value_map) {
     Subset* first = generate_first(G);
     
     FILE* file_first = fopen("output/first_sets.txt", "w");
@@ -1422,7 +1458,6 @@ Grammar tables_pipeline(Pair* mapping, int symbols_amount, char* prod_rules_src,
         fclose(file_first);
     }
 
-    // --- 4. CANONICAL COLLECTION & TRANSITIONS ---
     TableMaterial table_material = c_collection(G, first);
     destroy_first(G, first);
 
@@ -1434,13 +1469,14 @@ Grammar tables_pipeline(Pair* mapping, int symbols_amount, char* prod_rules_src,
         fclose(file_collection);
     }
 
-    // --- 5. LR(1) TABLE MAPPING ---
     TableMapping tables_info = create_tables(G, table_material);
     
-    // Final Export/Save
-    save_parsing_tables(&tables_info, "tables/text_tables.txt");
+    FILE* file_tables = fopen("output/parser_tables.txt", "w");
+    export_tables(&tables_info, file_tables);
+    fclose(file_tables);
 
-    return G;
+    save_parsing_tables(&tables_info, "tables/text_tables.txt");
+    destroy_tables(tables_info);
 }
 
 
@@ -1524,6 +1560,7 @@ int main(){
     int symbols_amount = 71;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
+    bool generate_tables = false;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
@@ -1543,40 +1580,18 @@ int main(){
 
     FA_destroy(&rules_regex);
 
-    // --- 3. FIRST SETS GENERATION ---
-    Subset* first = generate_first(G);
+    if(generate_tables){
+        printf("Tables Generated!\n");
+        tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map);
+    }
     
-    print_first_sets(G, first, value_map);
-    FILE* file_first = fopen("output/first_sets.txt", "w");
-    export_first_sets(G, first, value_map, file_first);
-    fclose(file_first);
+    TableMapping tables_info = load_parsing_tables("tables/text_tables.txt");
 
-    // --- 4. CANONICAL COLLECTION & TRANSITIONS ---
-    TableMaterial table_material = c_collection(G, first);
+    //assert_table_mappings_equal(&tables_info, &tables_info2);
+    //save_parsing_tables(&tables_info, "tables/loaded_text_tables.txt");
 
-    destroy_first(G, first);
+    printf("Tables Loaded!\n");
 
-    print_canonical_collection(table_material.CC, value_map);
-    print_transition_list(table_material.goto_transitions, value_map);
-
-    FILE* file_collection = fopen("output/collection.txt", "w");
-    export_canonical_collection(table_material.CC, value_map, file_collection);
-    fprintf(file_collection, "\n\n\n");
-    export_transition_list(table_material.goto_transitions, value_map, file_collection);
-    fclose(file_collection);
-
-    // --- 5. LR(1) TABLE MAPPING ---
-    TableMapping tables_info = create_tables(G, table_material);
-    
-    
-    print_tables(&tables_info);
-    FILE* file_tables = fopen("output/parser_tables.txt", "w");
-    export_tables(&tables_info, file_tables);
-    fclose(file_tables);
-    save_parsing_tables(&tables_info, "tables/text_tables.txt");
-    TableMapping mp = load_parsing_tables("tables/text_tables.txt");
-
-    return 0;
     // --- 6. LEXER EXECUTION ---
     char* file_dir = "languaje.k";
     char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(Init)$37|(Proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(break)$50|(continue)$51|(goto)$52|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
