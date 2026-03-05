@@ -1606,8 +1606,8 @@ int main(){
     int symbols_amount = 72;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
-    bool generate_parsing_tables = true;
-    bool generate_lexing_tables = true;
+    bool generate_parsing_tables = false;
+    bool generate_lexing_tables = false;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
