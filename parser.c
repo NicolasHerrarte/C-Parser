@@ -1554,7 +1554,7 @@ int main(){
         {"<=",              22},
         {">",               23},
         {"<",               24},
-        {"string",          25},
+        {"litstring",       25},
         {"true",            26},
         {"false",           27},
         {"Access",          28},
@@ -1579,34 +1579,35 @@ int main(){
         {"int",             47},
         {"bool",            48},
         {"float",           49},
-        {"break",           50},
-        {"continue",        51},
-        {"goto",            52},
-        {"Program",         53},
-        {"Block",           54},
-        {"CompStat",        55},
-        {"UnitStat",        56},
-        {"ControlStat",     57},
-        {"Stat",            58},
-        {"CondStat",        59},
-        {"LoopStat",        60},
-        {"While",           61},
-        {"For",             62},
-        {"Declaration",     63},
-        {"ProcDeclaration", 64},
-        {"Assignment",      65},
-        {"VarType",         66},
-        {"Primitive",       67},
-        {"Jump",            68},
-        {"Params",          69},
-        {"ParamsList",      70}
+        {"string",          50},
+        {"break",           51},
+        {"continue",        52},
+        {"goto",            53},
+        {"Program",         54},
+        {"Block",           55},
+        {"CompStat",        56},
+        {"UnitStat",        57},
+        {"ControlStat",     58},
+        {"Stat",            59},
+        {"CondStat",        60},
+        {"LoopStat",        61},
+        {"While",           62},
+        {"For",             63},
+        {"Declaration",     64},
+        {"ProcDeclaration", 65},
+        {"Assignment",      66},
+        {"VarType",         67},
+        {"Primitive",       68},
+        {"Jump",            69},
+        {"Params",          70},
+        {"ParamsList",      71}
     };
 
-    int symbols_amount = 71;
+    int symbols_amount = 72;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
     bool generate_parsing_tables = true;
-    bool generate_lexing_tables = false;
+    bool generate_lexing_tables = true;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
@@ -1648,7 +1649,7 @@ int main(){
 
     // --- 6. LEXER EXECUTION ---
     char* file_dir = "languaje.k";
-    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(Init)$37|(Proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(break)$50|(continue)$51|(goto)$52|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(Init)$37|(Proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(string)$50|(break)$51|(continue)$52|(goto)$53|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     int ignore_categories[] = {1};
 
     //FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);

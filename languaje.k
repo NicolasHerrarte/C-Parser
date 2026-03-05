@@ -1,1 +1,1 @@
-print(0);
+Init string[][] matrix;
