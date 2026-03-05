@@ -106,3 +106,8 @@ void _dynarray_pop(void *arr, void *dest)
     memcpy(dest, arr + (dynarray_length(arr) - 1) * dynarray_stride(arr), dynarray_stride(arr));
     _dynarray_field_set(arr, LENGTH, dynarray_length(arr) - 1); // Decrement length.
 }
+
+void _dynarray_reset(void *arr)
+{
+    _dynarray_field_set(arr, LENGTH, 0); // Reset length.
+}

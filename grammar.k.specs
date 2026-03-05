@@ -76,7 +76,7 @@ Term            /-> Term * Factor /;
 
 Factor          /-> Access /;
 /|              /-> integer /;
-/|              /-> float /;
+/|              /-> floating /;
 /|              /-> string /;
 /|              /-> true /;
 /|              /-> false /;

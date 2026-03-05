@@ -12,6 +12,7 @@
 #include "tree.h"
 
 #define DEFAULT_STACK_SIZE 3
+#define BUFFER_SIZE 4096
 
 enum {
     END,
@@ -528,8 +529,20 @@ Item* item_closure(Grammar G, Item* s_raw, Subset* first){
         change = false;
         for(int i = 0;i<dynarray_length(s);i++){
             int curr_k = s[i].k;
-            int C = (*s[i].beta)[curr_k];
             int beta_length = dynarray_length(*s[i].beta);
+            if(curr_k >= beta_length){continue;}
+            int C = (*s[i].beta)[curr_k];
+            if(C == EPSILON_P){
+                //printf("EPSILON FOUND\n");
+                Item new_item = item_copy(s[i]);
+                new_item.k ++;
+                
+                if(!item_in(s, new_item)){
+                    dynarray_push(s, new_item);
+                    change = true;
+                }
+                continue;
+            }
             for(int j = 0;j<dynarray_length(G.productions);j++){
                 if(G.productions[j].alpha == C){
 
@@ -656,6 +669,9 @@ TableMaterial c_collection(Grammar G, Subset* first){
 
                 for(int j=0;j<char_trans.capacity;j++){
                     if(char_trans.table[j]==true){
+                        if(j == EPSILON_P){
+                            continue;
+                        }
                         Item* temp = goto_table(G, current_cc, first, j);
                         CC_Item temp_item;
                         LRTransition new_transition;
@@ -764,8 +780,8 @@ void export_tables(TableMapping* tm, FILE* out) {
                 fprintf(out, " s%-3d |", action_val);
             } else if (action_type == 1) {
                 fprintf(out, " acc  |");
-            } else if (action_val == 3) {
-                fprintf(out, " r%-3d |", action_type + 1); 
+            } else if (action_type == 3) {
+                fprintf(out, " r%-3d |", action_val); 
             } else {
                 fprintf(out, "      |");
             }
@@ -1048,21 +1064,31 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     int* goto_mapping = dynarray_create(int);
     
 
-    int t_count = 1;
-    int nt_count = 0;
+    int t_count = 2;
+    int nt_count = 1;
 
     SS_add(&counted, END);
+    SS_add(&counted, EPSILON_P);
     symbols_mapping[END] = 0;
+    symbols_mapping[EPSILON_P] = 1;
 
     int end_rval = END;
+    int epsilon_rval = END;
     dynarray_push(action_mapping, end_rval);
+    dynarray_push(action_mapping, epsilon_rval);
+
+    SS_add(&counted, GOAL);
+    symbols_mapping[GOAL] = 0;
+
+    int goal_rval = GOAL;
+    dynarray_push(goto_mapping, goal_rval);
 
     //printf("--- Mappings ---\n");
 
     for(int i=0;i<dynarray_length(tb.goto_transitions);i++){
         int curr_symbol = tb.goto_transitions[i].trans_symbol;
         if(!SS_in(counted, curr_symbol)){
-            if(SS_in(fast_terminal,curr_symbol)){
+            if(SS_in(fast_terminal, curr_symbol)){
                 symbols_mapping[curr_symbol] = t_count;
                 dynarray_push(action_mapping, curr_symbol);
                 //printf("Terminal[%d] = %d\n", curr_symbol, t_count);
@@ -1071,7 +1097,7 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
             else{
                 symbols_mapping[curr_symbol] = nt_count;
                 dynarray_push(goto_mapping, curr_symbol);
-                //printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
+                printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
                 nt_count ++;
             }
             SS_add(&counted, curr_symbol);
@@ -1081,7 +1107,8 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     SS_destroy(&counted);
 
     //printf("--- Counts ---\n");
-    //printf("T: %d, NT: %d\n", t_count, nt_count);
+    printf("T: %d, NT: %d\n", t_count, nt_count);
+    printf("FUCK T: %d, NT: %d\n", t_length, nt_length);
     //printf("--- Actions ---\n");
 
     int*** table_action = malloc(states_count * sizeof(int**));
@@ -1263,12 +1290,14 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
 
         printf("--- Iteration ---\n");
         printf("Current Word: %s\n", index_mapping[token_ptr->category]);
+        printf("Current Cat: %d\n", token_ptr->category);
         printf("Current State: %d\n", top_state.s_int);
         print_stack(stack, index_mapping);
-        //printf("Stack Top-> %d\n", top_state.s_int);
-        //printf("Current Word-> %s\n", token_ptr->word);
 
         int word_category_table = tb.symbols_mapping[token_ptr->category];
+
+        printf("KILL ME -> %d\n", top_state.s_int);
+        printf("KILL ME -> %d\n", word_category_table);
 
         if(tb.table_action[top_state.s_int][word_category_table][0] == 3){
 
@@ -1279,31 +1308,47 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
             StackItem new_token;
             new_token.token.word = index_mapping[A];
             new_token.token.category = A;
-            
-            TreeNode** children = malloc(dynarray_length(beta)*sizeof(TreeNode*));
-            for(int i=0;i<dynarray_length(beta);i++){
-                int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE+extra_parameters));
-                assert(s>0);
-                children[i] = (TreeNode*) stack[s].s_ptr;
-                //printf("MAYBE\n");
-                //printf("%d, %d\n", s, dynarray_length(stack));
-                //print_node_info(children[i]);
+
+            int beta_non_epsilon_count = 0;
+            for(int i = 0;i<dynarray_length(beta);i++){
+                if(beta[i] != EPSILON_P){
+                    beta_non_epsilon_count++;
+                }
             }
 
-            TreeNode* tmp_node = tree_make_node(dynarray_length(beta), new_token.token.word, children);
+            TreeNode* tmp_node;
 
-            //printf("TMP NODE");
-            //print_node_info(tmp_node);
+            if(beta_non_epsilon_count == 0){
+                tmp_node = tree_make_node(0, new_token.token.word, NULL);
+            }
+            else{
+                TreeNode** children = malloc(beta_non_epsilon_count*sizeof(TreeNode*));
+                for(int i=0;i<beta_non_epsilon_count;i++){
+                    int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE+extra_parameters));
+                    assert(s>0);
+                    children[i] = (TreeNode*) stack[s].s_ptr;
+                    //printf("MAYBE\n");
+                    //printf("%d, %d\n", s, dynarray_length(stack));
+                    //print_node_info(children[i]);
+                }
 
-            free(children);
+                tmp_node = tree_make_node(beta_non_epsilon_count, new_token.token.word, children);
 
-            for(int i=0;i<(DEFAULT_STACK_SIZE+extra_parameters)*dynarray_length(beta);i++){
+                //printf("TMP NODE");
+                //print_node_info(tmp_node);
+
+                free(children);
+            }
+        
+
+            for(int i=0;i<(DEFAULT_STACK_SIZE+extra_parameters)*beta_non_epsilon_count;i++){
                 StackItem trash;
                 dynarray_pop(stack, &trash);
             }
             
-            //printf("stack get %d\n", dynarray_get_last(stack).s_int);
-            //printf("already_mapped %d\n", tb.symbols_mapping[A]);
+            printf("stack get %d\n", dynarray_get_last(stack).s_int);
+            printf("already_mapped %d\n", tb.symbols_mapping[A]);
+            printf("A %d\n", A);
             int to_state = tb.table_goto[dynarray_get_last(stack).s_int][tb.symbols_mapping[A]];
             
             StackItem new_node;
@@ -1371,9 +1416,9 @@ bool int_equal(void* a, void* b) {
     return *(int*)a == *(int*)b;
 }
 
-Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out){
+Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out){
     int ignore_categories[] = {1};
-    Token* token_anchor = scanner_loop_file(rules_regex, file_lexing_rules, ignore_categories, 1);
+    Token* token_anchor = file_scan(rules_regex, file_lexing_rules, BUFFER_SIZE, ignore_categories, 1);
     Token* token = token_anchor;
 
     export_token_seq(token, out);
@@ -1388,7 +1433,7 @@ Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping
     while(token->category != 0){
         if(state == 0 && token->category == 2){
             int* pointer_get = dynadict_get(dict_mapping,token->word);
-            printf("word: %s \n", token->word);
+            //printf("word: %s \n", token->word);
             if(pointer_get == NULL){
                 printf("Rules Synthax Error\n");
             }
@@ -1449,7 +1494,7 @@ Grammar build_grammar(FA rules_regex, char *file_lexing_rules, Hash dict_mapping
     return G;
 }
 
-void tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules, char** value_map) {
+TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules, char** value_map) {
     Subset* first = generate_first(G);
     
     FILE* file_first = fopen("output/first_sets.txt", "w");
@@ -1476,7 +1521,7 @@ void tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_ru
     fclose(file_tables);
 
     save_parsing_tables(&tables_info, "tables/text_tables.txt");
-    destroy_tables(tables_info);
+    return tables_info;
 }
 
 
@@ -1498,7 +1543,7 @@ int main(){
         {"(",               11},
         {")",               12},
         {"integer",         13},
-        {"float",           14},
+        {"floating",        14},
         {"name",            15},
         {"[",               16},
         {"]",               17},
@@ -1560,17 +1605,26 @@ int main(){
     int symbols_amount = 71;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
-    bool generate_tables = false;
+    bool generate_parsing_tables = true;
+    bool generate_lexing_tables = false;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
     char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])*)$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     
-    FA rules_regex = MakeFA(re_rules, "output/rules_dfa.txt", true);
+    //FA rules_regex = MakeFA(re_rules, "output/rules_dfa.txt", true);
+
+    if(generate_lexing_tables){
+        TableDFA tmp1 = make_tables(re_rules, "output/rules_dfa.txt", "tables/grammar_transitions.sc", true);
+        destroyDFATable(tmp1);
+    }
+    TableDFA table_load = loadDFATable("tables/grammar_transitions.sc");
     FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
     
-    Grammar G = build_grammar(rules_regex, prod_rules_src, dict_map, symbols_amount, file_rules_seq);
+    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, file_rules_seq);
     fclose(file_rules_seq);
+    destroyDFATable(table_load);
+
 
     // Export Grammar
     print_grammar(G, value_map);
@@ -1578,13 +1632,13 @@ int main(){
     export_grammar(G, value_map, file_grammar);
     fclose(file_grammar);
 
-    FA_destroy(&rules_regex);
-
-    if(generate_tables){
+    if(generate_parsing_tables){
         printf("Tables Generated!\n");
-        tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map);
+        TableMapping garbage = tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map);
+        destroy_tables(garbage);
     }
     
+    //TableMapping tables_info = tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map);
     TableMapping tables_info = load_parsing_tables("tables/text_tables.txt");
 
     //assert_table_mappings_equal(&tables_info, &tables_info2);
@@ -1597,10 +1651,17 @@ int main(){
     char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(Init)$37|(Proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(break)$50|(continue)$51|(goto)$52|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     int ignore_categories[] = {1};
 
-    FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
-    Token* scanner_out = scanner_loop_file(lexing_rules_regex, file_dir, ignore_categories, 1);
+    //FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
+    if(generate_lexing_tables){
+        TableDFA tmp2 = make_tables(lexing_rules, "output/lexer_dfa.txt", "tables/lexer_transitions.sc", true);
+        destroyDFATable(tmp2);
+    }
+    
+    TableDFA lexing_rules_table = loadDFATable("tables/lexer_transitions.sc");
 
-    FA_destroy(&lexing_rules_regex);
+    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1);
+
+    destroyDFATable(lexing_rules_table);
 
     print_token_seq(scanner_out);
     FILE* file_lexer_seq = fopen("output/lexer_seq.txt", "w");

@@ -15,6 +15,28 @@
 
 #define len_nfa_states(fa) dynarray_length(fa.states)
 
+#define INVALID 0
+#define BAD -1
+
+typedef struct ScannerState{
+    int input;
+    int fence;
+    char* buffer;
+} ScannerState;
+
+typedef struct TableDFA{
+    int** trans_table;
+    int* acc_states;
+    int* char_mapping;
+    int num_states;
+    int alphabet_size;
+} TableDFA;
+
+typedef struct ItemLexeme{
+    int state;
+    int pos;
+} ItemLexeme;
+
 typedef struct AcceptableState{
     int state;
     int category;
@@ -83,8 +105,12 @@ int* NFA_transition_function(FA nfa, int state, char c);
 int DFA_transition_function(FA dfa, int state, char c);
 
 FA NtoDFA(FA nfa);
-Token* scanner_loop_file(FA dfa, char* directory, int* ignore_cats, int amount_ignore);
-Token* scanner_loop_string(FA dfa, char* src, int* ignore_cats, int amount_ignore);
+void saveDFATable(TableDFA tables, char* directory);
+TableDFA loadDFATable(char* directory);
+void destroyDFATable(TableDFA table);
+long stream_len(FILE *stream);
+Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_pos, ScannerState* sc, int n);
+Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore);
 
-FA MakeFA(char *src, char* out_dir, bool debug);
+TableDFA make_tables(char *src, char* out_dir, char* save_dir, bool debug);
 
