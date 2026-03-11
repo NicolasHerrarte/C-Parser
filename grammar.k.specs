@@ -30,10 +30,10 @@ While           /-> while ( Expr ) Block /;
 
 For             /-> for ( Stat ; Expr ; Stat ) Block /;
 
-Declaration     /-> Init VarType name /;
-/|              /-> Init VarType name <- Expr /;
+Declaration     /-> Init VarType Identifier /;
+/|              /-> Init VarType Identifier <- Expr /;
 
-ProcDeclaration /-> Proc name ( Params ) -> VarType Block /;
+ProcDeclaration /-> Proc Identifier ( Params ) -> VarType Block /;
 
 Assignment      /-> Access = Expr /;
 
@@ -60,8 +60,10 @@ ArgList         /-> ArgList , Expr /;
 Params          /-> ParamsList /;
 /|              /-> Epsilon /;
 
-ParamsList      /-> ParamsList , name : VarType /;
-/|              /-> name : VarType /;
+ParamsList      /-> ParamsList , SingleParam /;
+/|              /-> SingleParam /;
+
+SingleParam     /-> Identifier : VarType /;
 
 Expr            /-> Expr LoP Eval /;
 /|              /-> Eval /;
@@ -83,11 +85,13 @@ Factor          /-> Access /;
 
 Access          /-> Access [ Expr ] /;
 /|              /-> Access ( Args ) /;
-/|              /-> Access . name /;
+/|              /-> Access . Identifier /;
 /|              /-> AccessBase /;
 
-AccessBase      /-> name /;
+AccessBase      /-> Identifier /;
 /|              /-> ( Expr ) /;
+
+Identifier      /-> name /;
 
 LoP             /-> =? /;
 /|              /-> >= /;

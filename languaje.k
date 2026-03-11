@@ -1,5 +1,5 @@
 Proc calculateSum(a : int, b : int) -> int {
-    Init int result <- a + b;
+    Init int result <- 5 + b;
     return result;
 }
 
