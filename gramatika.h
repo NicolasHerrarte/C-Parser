@@ -1,0 +1,54 @@
+#include "dynarray.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "scanner.h"
+#include "hash.h"
+
+typedef struct Production{
+    int alpha;
+    int* beta;
+} Production;
+
+typedef struct MakeBuild{
+    int classification;
+    int* coords;
+} MakeBuild;
+
+typedef struct AppendBuild{
+    int ap_from;
+    int ap_to;
+} AppendBuild;
+
+typedef struct ShiftBuild{
+    int shift_coord;
+} ShiftBuild;
+
+typedef struct BuildUp{
+    int type;
+    union{
+        MakeBuild mkbuild;
+        AppendBuild apbuild;
+        ShiftBuild shbuild;
+        int identifier;
+    } BuildUnion;
+} BuildUp;
+
+typedef struct Grammar{
+    int* T;
+    int* NT;
+    int S;
+    Production* productions;
+    BuildUp* builds;
+} Grammar;
+
+void export_production(Production prod, char** index_mapping, FILE* out);
+void print_production(Production prod, char** index_mapping);
+void export_build(BuildUp B, FILE* out);
+void print_build(BuildUp B, FILE* out);
+void export_grammar(Grammar G, char** index_mapping, FILE* out);
+void print_grammar(Grammar G, char** index_mapping);
+Grammar create_grammar();
+Production create_production(int a, int* b, int b_count);
+Production destroy_production(Production* production);
+void destroy_grammar(Grammar* G);
+Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out);
