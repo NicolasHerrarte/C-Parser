@@ -13,6 +13,8 @@
 #include "gramatika.h"
 
 #define DEFAULT_STACK_SIZE 3
+#define TREENODE_POS 0
+#define AST_POS 1
 #define BUFFER_SIZE 4096
 
 enum {
@@ -1168,7 +1170,7 @@ char** storage_table_from_mapping(Pair* mapping, int map_size){
 }
 
 
-TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extra_parameters, char** index_mapping){
+TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** index_mapping){
 
     StackItem* stack = dynarray_create(StackItem);
     //StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
@@ -1228,7 +1230,7 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
             else{
                 TreeNode** children = malloc(beta_non_epsilon_count*sizeof(TreeNode*));
                 for(int i=0;i<beta_non_epsilon_count;i++){
-                    int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE+extra_parameters));
+                    int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE))+TREENODE_POS;
                     assert(s>0);
                     children[i] = (TreeNode*) stack[s].s_ptr;
                     //printf("MAYBE\n");
@@ -1245,7 +1247,7 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
             }
         
 
-            for(int i=0;i<(DEFAULT_STACK_SIZE+extra_parameters)*beta_non_epsilon_count;i++){
+            for(int i=0;i<(DEFAULT_STACK_SIZE)*beta_non_epsilon_count;i++){
                 StackItem trash;
                 dynarray_pop(stack, &trash);
             }
@@ -1308,7 +1310,7 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, int extr
         //printf("%s", token_ptr->word);
     } while(true);
 
-    TreeNode* root = (TreeNode*) stack[DEFAULT_STACK_SIZE+extra_parameters].s_ptr;
+    TreeNode* root = (TreeNode*) stack[DEFAULT_STACK_SIZE].s_ptr;
 
     dynarray_destroy(stack);
     tree_destroy_node(first_node.s_ptr);
@@ -1502,7 +1504,7 @@ int main(){
     fclose(file_lexer_seq);
 
     // --- 7. PARSER EXECUTION ---
-    TreeNode* root = parser_skeleton(G, tables_info, scanner_out, 0, value_map);
+    TreeNode* root = parser_skeleton(G, tables_info, scanner_out, value_map);
 
     dynarray_destroy(scanner_out);
     destroy_tables(tables_info);
