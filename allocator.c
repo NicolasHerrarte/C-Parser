@@ -37,14 +37,20 @@ Arena* _arena_expand_auto(Arena* header){
 void* arena_get(Arena* header, size_t chunk_size){
     void* chunk;
     if(header->current->occupied + chunk_size <= header->capacity){
+        printf("SAVE STORAGE\n");
         chunk = _get_storage(header->current) + header->current->occupied;
         header->current->occupied += chunk_size;
         return chunk;
     }
     else if(chunk_size > header->capacity){
-        return _get_storage(_arena_expand(header, chunk_size));
+        printf("EXPAND FIT\n");
+        Arena* new_header_fit = _arena_expand(header, chunk_size);
+        chunk = _get_storage(new_header_fit);
+        new_header_fit->occupied += chunk_size;
+        return chunk;
     }
     else{
+        printf("EXPAND NORMAL\n");
         Arena* new_header = _arena_expand_auto(header);
         chunk = _get_storage(new_header);
         new_header->occupied += chunk_size;
@@ -59,13 +65,10 @@ void arena_destroy(Arena* header){
     if (header == NULL) return;
 
     if(header->next != NULL){
-        _arena_destroy(header->next);
+        arena_destroy(header->next);
     }
 
     free(header);
 }
 
 
-int main(void) {
-
-}
