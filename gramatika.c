@@ -138,20 +138,27 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     BuildUp* builds = dynarray_create(BuildUp);
 
     BuildUp build_default;
-    build_default.type = 0;
+    build_default.type = SHIFT;
     build_default.BuildUnion.shbuild.shift_coord = 0;
 
     BuildUp build_default_1;
-    build_default_1.type = 0;
+    build_default_1.type = SHIFT;
     build_default_1.BuildUnion.shbuild.shift_coord = 1;
 
     BuildUp build4;
-    build4.type = 1;
+    build4.type = APPEND;
     build4.BuildUnion.apbuild.ap_from = 1;
     build4.BuildUnion.apbuild.ap_to = 0;
 
+    BuildUp build3;
+    build3.type = MAKE_NODE;
+    int* build3_coords = dynarray_create(int);
+    dynarray_push_rval(build3_coords, 0);
+    build3.BuildUnion.mkbuild.coords = build3_coords;
+    build3.BuildUnion.mkbuild.classification = 56;
+
     BuildUp build14;
-    build14.type = 2;
+    build14.type = MAKE_NODE;
     int* build14_coords = dynarray_create(int);
     dynarray_push_rval(build14_coords, 2);
     dynarray_push_rval(build14_coords, 4);
@@ -159,7 +166,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build14.BuildUnion.mkbuild.classification = 60;
 
     BuildUp build15;
-    build15.type = 2;
+    build15.type = MAKE_NODE;
     int* build15_coords = dynarray_create(int);
     dynarray_push_rval(build15_coords, 2);
     dynarray_push_rval(build15_coords, 4);
@@ -168,7 +175,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build15.BuildUnion.mkbuild.classification = 60;
 
     BuildUp build16;
-    build16.type = 2;
+    build16.type = MAKE_NODE;
     int* build16_coords = dynarray_create(int);
     dynarray_push_rval(build16_coords, 2);
     dynarray_push_rval(build16_coords, 4);
@@ -177,7 +184,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build16.BuildUnion.mkbuild.classification = 60;
 
     BuildUp build19;
-    build19.type = 2;
+    build19.type = MAKE_NODE;
     int* build19_coords = dynarray_create(int);
     dynarray_push_rval(build19_coords, 2);
     dynarray_push_rval(build19_coords, 4);
@@ -185,7 +192,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build19.BuildUnion.mkbuild.classification = 62;
 
     BuildUp build20;
-    build20.type = 2;
+    build20.type = MAKE_NODE;
     int* build20_coords = dynarray_create(int);
     dynarray_push_rval(build20_coords, 2);
     dynarray_push_rval(build20_coords, 4);
@@ -195,7 +202,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build20.BuildUnion.mkbuild.classification = 63;
 
     BuildUp build21;
-    build21.type = 2;
+    build21.type = MAKE_NODE;
     int* build21_coords = dynarray_create(int);
     dynarray_push_rval(build21_coords, 1);
     dynarray_push_rval(build21_coords, 2);
@@ -203,7 +210,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build21.BuildUnion.mkbuild.classification = 64;
 
     BuildUp build22;
-    build22.type = 2;
+    build22.type = MAKE_NODE;
     int* build22_coords = dynarray_create(int);
     dynarray_push_rval(build22_coords, 1);
     dynarray_push_rval(build22_coords, 2);
@@ -212,7 +219,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build22.BuildUnion.mkbuild.classification = 64;
 
     BuildUp build23;
-    build23.type = 2;
+    build23.type = MAKE_NODE;
     int* build23_coords = dynarray_create(int);
     dynarray_push_rval(build23_coords, 1);
     dynarray_push_rval(build23_coords, 3);
@@ -222,7 +229,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build23.BuildUnion.mkbuild.classification = 65;
 
     BuildUp build24;
-    build24.type = 2;
+    build24.type = MAKE_NODE;
     int* build24_coords = dynarray_create(int);
     dynarray_push_rval(build24_coords, 0);
     dynarray_push_rval(build24_coords, 2);
@@ -230,100 +237,100 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build24.BuildUnion.mkbuild.classification = 65;
 
     BuildUp build25;
-    build25.type = 2;
+    build25.type = MAKE_NODE;
     int* build25_coords = dynarray_create(int);
     dynarray_push_rval(build25_coords, 0);
     build25.BuildUnion.mkbuild.coords = build25_coords;
     build25.BuildUnion.mkbuild.classification = 67;
 
     BuildUp build26;
-    build26.type = 2;
+    build26.type = MAKE_NODE;
     int* build26_coords = dynarray_create(int);
     dynarray_push_rval(build26_coords, 0);
     build26.BuildUnion.mkbuild.coords = build26_coords;
     build26.BuildUnion.mkbuild.classification = 100;
 
     BuildUp build27;
-    build27.type = 4;
+    build27.type = VALUE;
     build27.BuildUnion.identifier = 0;
     
     BuildUp build28;
-    build28.type = 4;
+    build28.type = VALUE;
     build28.BuildUnion.identifier = 1;
 
     BuildUp build29;
-    build29.type = 4;
+    build29.type = VALUE;
     build29.BuildUnion.identifier = 2;
 
     BuildUp build30;
-    build30.type = 4;
+    build30.type = VALUE;
     build30.BuildUnion.identifier = 3;
 
     BuildUp build31;
-    build31.type = 2;
+    build31.type = MAKE_NODE;
     build31.BuildUnion.mkbuild.coords = NULL;
     build31.BuildUnion.mkbuild.classification = 51;
 
     BuildUp build32;
-    build32.type = 2;
+    build32.type = MAKE_NODE;
     build32.BuildUnion.mkbuild.coords = NULL;
     build32.BuildUnion.mkbuild.classification = 52;
 
     BuildUp build33;
-    build33.type = 2;
+    build33.type = MAKE_NODE;
     build33.BuildUnion.mkbuild.coords = NULL;
     build33.BuildUnion.mkbuild.classification = 39;
 
     BuildUp build34;
-    build34.type = 2;
+    build34.type = MAKE_NODE;
     int* build34_coords = dynarray_create(int);
     dynarray_push_rval(build34_coords, 1);
     build34.BuildUnion.mkbuild.coords = build34_coords;
     build34.BuildUnion.mkbuild.classification = 39;
 
     BuildUp build35;
-    build35.type = 2;
+    build35.type = MAKE_NODE;
     int* build35_coords = dynarray_create(int);
     dynarray_push_rval(build35_coords, 1);
     build35.BuildUnion.mkbuild.coords = build35_coords;
     build35.BuildUnion.mkbuild.classification = 53;
 
     BuildUp build37;
-    build37.type = 2;
+    build37.type = MAKE_NODE;
     build37.BuildUnion.mkbuild.coords = NULL;
     build37.BuildUnion.mkbuild.classification = 32;
 
     BuildUp build38;
-    build38.type = 1;
+    build38.type = APPEND;
     build38.BuildUnion.apbuild.ap_from = 2;
     build38.BuildUnion.apbuild.ap_to = 0;
 
     BuildUp build39;
-    build39.type = 2;
+    build39.type = MAKE_NODE;
     int* build39_coords = dynarray_create(int);
     dynarray_push_rval(build39_coords, 0);
     build39.BuildUnion.mkbuild.coords = build39_coords;
     build39.BuildUnion.mkbuild.classification = 32;
 
     BuildUp build41;
-    build37.type = 2;
-    build37.BuildUnion.mkbuild.coords = NULL;
-    build37.BuildUnion.mkbuild.classification = 70;    
+    build41.type = MAKE_NODE;
+    build41.BuildUnion.mkbuild.coords = NULL;
+    build41.BuildUnion.mkbuild.classification = 70;    
 
     BuildUp build42;
-    build42.type = 1;
+    build42.type = APPEND;
     build42.BuildUnion.apbuild.ap_from = 2;
     build42.BuildUnion.apbuild.ap_to = 0;
 
     BuildUp build43;
-    build43.type = 2;
+    build43.type = MAKE_NODE;
     int* build43_coords = dynarray_create(int);
     dynarray_push_rval(build43_coords, 0);
     build43.BuildUnion.mkbuild.coords = build43_coords;
     build43.BuildUnion.mkbuild.classification = 70;
 
     BuildUp build44;
-    build44.type = 2;
+    build44.type = MAKE_NODE;
     int* build44_coords = dynarray_create(int);
     dynarray_push_rval(build44_coords, 0);
     dynarray_push_rval(build44_coords, 2);
@@ -331,7 +338,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build44.BuildUnion.mkbuild.classification = 72;
 
     BuildUp build45;
-    build45.type = 2;
+    build45.type = MAKE_NODE;
     int* build45_coords = dynarray_create(int);
     dynarray_push_rval(build45_coords, 0);
     dynarray_push_rval(build45_coords, 1);
@@ -340,7 +347,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build45.BuildUnion.mkbuild.classification = 30;
 
     BuildUp build47;
-    build47.type = 2;
+    build47.type = MAKE_NODE;
     int* build47_coords = dynarray_create(int);
     dynarray_push_rval(build47_coords, 0);
     dynarray_push_rval(build47_coords, 2);
@@ -348,7 +355,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build47.BuildUnion.mkbuild.classification = 7;
 
     BuildUp build48;
-    build48.type = 2;
+    build48.type = MAKE_NODE;
     int* build48_coords = dynarray_create(int);
     dynarray_push_rval(build48_coords, 0);
     dynarray_push_rval(build48_coords, 2);
@@ -356,7 +363,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build48.BuildUnion.mkbuild.classification = 8;
 
     BuildUp build50;
-    build50.type = 2;
+    build50.type = MAKE_NODE;
     int* build50_coords = dynarray_create(int);
     dynarray_push_rval(build50_coords, 0);
     dynarray_push_rval(build50_coords, 2);
@@ -364,7 +371,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build50.BuildUnion.mkbuild.classification = 9;
 
     BuildUp build51;
-    build51.type = 2;
+    build51.type = MAKE_NODE;
     int* build51_coords = dynarray_create(int);
     dynarray_push_rval(build51_coords, 0);
     dynarray_push_rval(build51_coords, 2);
@@ -372,23 +379,27 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build51.BuildUnion.mkbuild.classification = 10;
 
     BuildUp build_int;
-    build_int.type = 3;
+    build_int.type = BOX_NODE;
     build_int.BuildUnion.identifier = 0;
 
     BuildUp build_float;
-    build_float.type = 3;
+    build_float.type = BOX_NODE;
     build_float.BuildUnion.identifier = 1;
 
     BuildUp build_litstring;
-    build_litstring.type = 3;
+    build_litstring.type = BOX_NODE;
     build_litstring.BuildUnion.identifier = 2;
 
-    BuildUp build_boolean;
-    build_boolean.type = 3;
-    build_boolean.BuildUnion.identifier = 3;
+    BuildUp build_boolean_true;
+    build_boolean_true.type = BOX_NODE;
+    build_boolean_true.BuildUnion.identifier = 3;
+
+    BuildUp build_boolean_false;
+    build_boolean_false.type = BOX_NODE;
+    build_boolean_false.BuildUnion.identifier = 4;
 
     BuildUp build59;
-    build59.type = 2;
+    build59.type = MAKE_NODE;
     int* build59_coords = dynarray_create(int);
     dynarray_push_rval(build59_coords, 0);
     dynarray_push_rval(build59_coords, 2);
@@ -396,7 +407,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build59.BuildUnion.mkbuild.classification = 101;
 
     BuildUp build60;
-    build60.type = 2;
+    build60.type = MAKE_NODE;
     int* build60_coords = dynarray_create(int);
     dynarray_push_rval(build60_coords, 0);
     dynarray_push_rval(build60_coords, 2);
@@ -404,7 +415,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build60.BuildUnion.mkbuild.classification = 102;
 
     BuildUp build61;
-    build61.type = 2;
+    build61.type = MAKE_NODE;
     int* build61_coords = dynarray_create(int);
     dynarray_push_rval(build61_coords, 0);
     dynarray_push_rval(build61_coords, 2);
@@ -412,27 +423,27 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     build61.BuildUnion.mkbuild.classification = 103;
     
     BuildUp build_identifier;
-    build_identifier.type = 3;
-    build_identifier.BuildUnion.identifier = 4;
+    build_identifier.type = BOX_NODE;
+    build_identifier.BuildUnion.identifier = 5;
 
     BuildUp build66;
-    build66.type = 4;
+    build66.type = VALUE;
     build66.BuildUnion.identifier = 0;
 
     BuildUp build67;
-    build67.type = 4;
+    build67.type = VALUE;
     build67.BuildUnion.identifier = 1;
 
     BuildUp build68;
-    build68.type = 4;
+    build68.type = VALUE;
     build68.BuildUnion.identifier = 2;
 
     BuildUp build69;
-    build69.type = 4;
+    build69.type = VALUE;
     build69.BuildUnion.identifier = 3;
 
     BuildUp build70;
-    build70.type = 4;
+    build70.type = VALUE;
     build70.BuildUnion.identifier = 4;
 
     //0
@@ -441,8 +452,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     dynarray_push(builds, build_default);
     //2
     dynarray_push(builds, build_default_1);
-    //3
-    dynarray_push(builds, build_default);
+    dynarray_push(builds, build3);
     dynarray_push(builds, build4);
     //5
     dynarray_push(builds, build_default);
@@ -518,9 +528,9 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     //56
     dynarray_push(builds, build_litstring);
     //57
-    dynarray_push(builds, build_boolean);
+    dynarray_push(builds, build_boolean_true);
     //58
-    dynarray_push(builds, build_boolean);
+    dynarray_push(builds, build_boolean_false);
     dynarray_push(builds, build59);
     dynarray_push(builds, build60);
     dynarray_push(builds, build61);

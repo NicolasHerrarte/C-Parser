@@ -9,7 +9,6 @@
 #include "subset.h"
 #include "scanner.h"
 
-
 void export_safe_char(char c, FILE* out) {
     switch (c) {
         case '\n': fprintf(out, "\\n"); break;

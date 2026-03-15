@@ -4,6 +4,14 @@
 #include "scanner.h"
 #include "hash.h"
 
+enum Instructions {
+    SHIFT,
+    APPEND,
+    MAKE_NODE,
+    BOX_NODE,
+    VALUE
+};
+
 typedef struct Production{
     int alpha;
     int* beta;

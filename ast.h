@@ -12,7 +12,8 @@ enum BoxWrapper{
     FLOAT_WRAPPER,
     STRING_WRAPPER,
     BOOL_WRAPPER,
-    ID_WRAPPER
+    ID_WRAPPER,
+    TYPE_WRAPPER
 };
 
 enum BoxMode{
@@ -51,6 +52,7 @@ typedef struct ASTNode{
         struct Box* box;
         char* label;
     } storage;
+    struct ASTNode* sibling;
     enum ChildTag tag;
 } ASTNode;
 
@@ -59,9 +61,11 @@ typedef struct TreeManager{
     ASTNode root;
 } TreeManager;
 
+ASTNode append_node(Arena* arena, ASTNode origin, ASTNode* children, int children_amount);
 ASTNode create_node(Arena* arena, int nodetype, ASTNode* children, int children_amount);
 ASTNode create_label(Arena* arena, char* token_char, int char_length);
 ASTNode create_box(Arena* arena, enum BoxMode boxtype, ASTNode child);
+ASTNode create_value_box(Arena* arena, int value);
 TreeManager initializeAST();
 void destroyAST(TreeManager tm);
 void print_ast(ASTNode node, char* prefix, bool is_last);

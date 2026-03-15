@@ -6,17 +6,57 @@
 #include "allocator.h"
 #include "ast.h"
 
+ASTNode append_node(Arena* arena, ASTNode origin, ASTNode* children, int children_amount){
+    ASTNode* children_storage = (ASTNode*) arena_get(arena, children_amount*sizeof(ASTNode));
+    for(int i = 0;i<children_amount; i++){
+        children_storage[i] = children[i];
+    }
+
+    for(int i = 0;i<children_amount; i++){
+        if(i+1 < children_amount){
+            children_storage[i].sibling = &children_storage[i+1];
+        }
+        else{
+            children_storage[i].sibling = NULL;
+        }
+    }
+
+    if(origin.storage.node->amount_children == 0){
+        origin.storage.node->children = children_storage;
+    }
+    else{
+        ASTNode* current = origin.storage.node->children; 
+        int count = 1;
+        while (current->sibling != NULL) {
+            current = current->sibling;
+            count ++;
+        }
+
+        current->sibling = children_storage;
+
+        assert(origin.storage.node->amount_children == count);
+    }
+
+    origin.storage.node->amount_children += children_amount;
+
+    return origin;
+}
+
 ASTNode create_node(Arena* arena, int nodetype, ASTNode* children, int children_amount){
     ASTNode new_child;
     new_child.tag = NODE;
 
     InternalNode* node_storage = (InternalNode*) arena_get(arena, sizeof(InternalNode));
-    node_storage->children = children;
-    node_storage->amount_children = children_amount;
+    node_storage->children = NULL;
+    node_storage->amount_children = 0;
     node_storage->type = nodetype;
 
     new_child.storage.node = node_storage;
-    return new_child;
+    new_child.sibling = NULL;
+    
+    ASTNode appended_child = append_node(arena, new_child, children, children_amount);
+
+    return appended_child;
 }
 
 ASTNode create_label(Arena* arena, char* token_char, int char_length){
@@ -80,6 +120,18 @@ ASTNode create_box(Arena* arena, enum BoxMode boxtype, ASTNode child){
     return new_child;
 }
 
+ASTNode create_value_box(Arena* arena, int value){  
+    ASTNode new_child;
+    new_child.tag = BOX;
+
+    Box* box_storage = (Box*) arena_get(arena, sizeof(Box));
+    box_storage->wrapper = TYPE_WRAPPER;
+    box_storage->value.bint = value;
+
+    new_child.storage.box = box_storage;
+    return new_child;
+}
+
 TreeManager initializeAST(){
     Arena* arena = arena_create(sizeof(ASTNode) * ARENA_CHUNK_SIZE);
     ASTNode root = create_node(arena, ROOT_TYPE, NULL, 0);
@@ -109,22 +161,32 @@ void print_ast(ASTNode node, char* prefix, bool is_last) {
                      prefix, is_last ? "    " : "│   ");
         }
 
-        for (int i = 0; i < internal->amount_children; i++) {
-            bool last_child = (i == internal->amount_children - 1);
+        ASTNode* current = internal->children; 
+
+        while (current != NULL) {
+            // A node is the last child if it has no more siblings
+            bool last_child = (current->sibling == NULL);
             
-            if (prefix[0] == '\0') {
-                print_ast(internal->children[i], " ", last_child);
-            } else {
-                print_ast(internal->children[i], next_prefix, last_child);
-            }
+            // Prepare the prefix logic
+            char* actual_prefix = (prefix[0] == '\0') ? " " : next_prefix;
+
+            // Recurse using the current node
+            // Note: We pass *current because your print_ast likely expects the struct, 
+            // or current if it expects a pointer.
+            print_ast(*current, actual_prefix, last_child);
+
+            // Move to the next sibling
+            current = current->sibling;
         }
     } 
     else if (node.tag == BOX) {
         Box* b = node.storage.box;
         if (b->wrapper == ID_WRAPPER) printf("[ID] %s\n", b->value.bstring);
         else if (b->wrapper == INT_WRAPPER) printf("[INT] %d\n", b->value.bint);
+        else if (b->wrapper == BOOL_WRAPPER) printf("[BOOL] %d\n", b->value.bint);
         else if (b->wrapper == FLOAT_WRAPPER) printf("[FLOAT] %.2f\n", b->value.bfloat);
         else if (b->wrapper == STRING_WRAPPER) printf("[STR] %s\n", b->value.bstring);
+        else if (b->wrapper == TYPE_WRAPPER) printf("[TYPE] %d\n", b->value.bint);
     }
 }
 
@@ -132,38 +194,41 @@ void ast_routine() {
     TreeManager tm = initializeAST();
     Arena* arena = tm.arena;
 
-    printf("--- Building Complex AST: IF-ELSE Statement ---\n\n");
+    printf("--- Building Complex AST: Testing Append Logic ---\n\n");
 
+    // 1. Create Leaves
     ASTNode id_x = create_box(arena, ID_M, create_label(arena, "x", 1));
     ASTNode val_10 = create_box(arena, INT_M, create_label(arena, "10", 2));
     
-    ASTNode* cond_children = (ASTNode*)arena_get(arena, sizeof(ASTNode) * 2);
-    cond_children[0] = id_x;
-    cond_children[1] = val_10;
-    ASTNode condition = create_node(arena, 101, cond_children, 2);
+    // 2. Build Condition Node (Using create_node)
+    ASTNode cond_stack[2] = { id_x, val_10 };
+    ASTNode condition = create_node(arena, 101, cond_stack, 2);
 
+    // 3. Build Then/Else Stmts
     ASTNode str_true = create_box(arena, STRING_M, create_label(arena, "\"True\"", 6));
-    
-    ASTNode* print_args = (ASTNode*)arena_get(arena, sizeof(ASTNode) * 1);
-    print_args[0] = str_true;
-    ASTNode then_stmt = create_node(arena, 201, print_args, 1);
+    ASTNode print_stack[1] = { str_true };
+    ASTNode then_stmt = create_node(arena, 201, print_stack, 1);
 
     ASTNode id_y = create_box(arena, ID_M, create_label(arena, "y", 1));
     ASTNode val_pi = create_box(arena, FLOAT_M, create_label(arena, "3.14", 4));
+    ASTNode assign_stack[2] = { id_y, val_pi };
+    ASTNode else_stmt = create_node(arena, 1, assign_stack, 2);
     
-    ASTNode* assign_children = (ASTNode*)arena_get(arena, sizeof(ASTNode) * 2);
-    assign_children[0] = id_y;
-    assign_children[1] = val_pi;
-    ASTNode else_stmt = create_node(arena, 1, assign_children, 2);
+    // --- TEST APPENDING LOGIC HERE ---
 
-    ASTNode* if_children = (ASTNode*)arena_get(arena, sizeof(ASTNode) * 3);
-    if_children[0] = condition;
-    if_children[1] = then_stmt;
-    if_children[2] = else_stmt;
-    
-    ASTNode root = create_node(arena, 301, if_children, 3);
+    // 4. Create an empty "IF" node (Type 301)
+    ASTNode root = create_node(arena, 301, NULL, 0);
+
+    // 5. Append the condition node first
+    root = append_node(arena, root, &condition, 1);
+
+    // 6. Append the Then and Else branches as a batch
+    ASTNode branches[2] = { then_stmt, else_stmt };
+    root = append_node(arena, root, branches, 2);
+
+    // ---------------------------------
+
     tm.root = root;
-
     print_ast(tm.root, "", true);
 
     destroyAST(tm);

@@ -11,10 +11,9 @@
 #include "re_pp.h"
 #include "tree.h"
 #include "gramatika.h"
+#include "ast.h"
 
-#define DEFAULT_STACK_SIZE 3
-#define TREENODE_POS 0
-#define AST_POS 1
+#define DEFAULT_STACK_SIZE 4
 #define BUFFER_SIZE 4096
 
 enum {
@@ -23,6 +22,17 @@ enum {
     GOAL,
 };
 
+enum {
+    TREENODE_POS,
+    AST_POS,
+    TOKEN_POS,
+    STATE_POS,
+};
+
+typedef struct ParserOutput{
+    TreeNode* CST;
+    TreeManager AST;
+} ParserOutput;
 
 typedef struct Item{
     int alpha;
@@ -46,6 +56,7 @@ typedef struct LRTransition{
 
 typedef union StackItem{
     Token token;
+    ASTNode ast_node;
     void* s_ptr;
     int s_int;
 } StackItem;
@@ -1003,7 +1014,7 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
             else{
                 symbols_mapping[curr_symbol] = nt_count;
                 dynarray_push(goto_mapping, curr_symbol);
-                printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
+                //printf("Non-Terminal[%d] = %d\n", curr_symbol, nt_count);
                 nt_count ++;
             }
             SS_add(&counted, curr_symbol);
@@ -1134,16 +1145,42 @@ void print_stack(StackItem* stack, char** index_mapping) {
     printf("[ ");
     
     for (int i = 0; i < len; i++) {
-        if (i % DEFAULT_STACK_SIZE == 1) {
+        if(i % DEFAULT_STACK_SIZE == 0){
+            printf("| ");
+        }
+        if (i % DEFAULT_STACK_SIZE == TOKEN_POS) {
             printf("%s ", index_mapping[stack[i].token.category]);
         }
-        else if (i % DEFAULT_STACK_SIZE == 2){
+        else if (i % DEFAULT_STACK_SIZE == STATE_POS){
             printf("%d ", stack[i].s_int);
         }
-        else if (i % DEFAULT_STACK_SIZE == 0){
-            printf("%d ", ((TreeNode*) (stack[i].s_ptr))->children_amount);
+        else if (i % DEFAULT_STACK_SIZE == TREENODE_POS){
+            printf("", ((TreeNode*) (stack[i].s_ptr))->children_amount);
+        }
+        else if (i % DEFAULT_STACK_SIZE == AST_POS){
+            printf("%d ", (stack[i].ast_node.tag));
+            switch (stack[i].ast_node.tag) {
+                case NODE:
+                    printf("NODE(type -> %d, children-> %d) ", stack[i].ast_node.storage.node->type, stack[i].ast_node.storage.node->amount_children);
+                    break;
+                case BOX:
+                    Box* b = stack[i].ast_node.storage.box;
+                    if (b->wrapper == ID_WRAPPER) printf("ID(%s) ", b->value.bstring);
+                    else if (b->wrapper == INT_WRAPPER) printf("INT(%d) ", b->value.bint);
+                    else if (b->wrapper == BOOL_WRAPPER) printf("BOOL(%d) ", b->value.bint);
+                    else if (b->wrapper == FLOAT_WRAPPER) printf("FLOAT(%.2f) ", b->value.bfloat);
+                    else if (b->wrapper == STRING_WRAPPER) printf("STR(%s) ", b->value.bstring);
+                    break;
+                case LABEL:
+                    printf("LABEL(%s) ", (stack[i].ast_node.storage.label));
+                    break; 
+                default:
+                    assert(false);
+            }
         }
     }
+
+    printf("|");
     
     printf("]\n");
 }
@@ -1169,23 +1206,29 @@ char** storage_table_from_mapping(Pair* mapping, int map_size){
     return inverse_map;
 }
 
+int get_stack_position(int stack_len, int element, int offset){
+    return stack_len-((element+1)*(DEFAULT_STACK_SIZE))+offset;
+}
 
-TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** index_mapping){
+ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** index_mapping){
 
+    TreeManager tm = initializeAST();
     StackItem* stack = dynarray_create(StackItem);
-    //StackItem* token_bs = malloc((2+extra_parameters)*2*sizeof(StackItem));
 
+    StackItem first_asn;
     StackItem first_node;
     StackItem first_word;
     StackItem first_state;
 
     first_state.s_int = 0;
 
-    first_node.s_ptr = tree_make_node(0, "Root", NULL);
+    first_asn.ast_node = create_label(tm.arena, "Trash", 5);
+    first_node.s_ptr = tree_make_node(0, "Trash", NULL);
     first_word.token.word = "";
     first_word.token.category = END;
 
     dynarray_push(stack, first_node);
+    dynarray_push(stack, first_asn);
     dynarray_push(stack, first_word);
     dynarray_push(stack, first_state);
 
@@ -1202,8 +1245,8 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** i
 
         int word_category_table = tb.symbols_mapping[token_ptr->category];
 
-        printf("KILL ME -> %d\n", top_state.s_int);
-        printf("KILL ME -> %d\n", word_category_table);
+        //printf("KILL ME -> %d\n", top_state.s_int);
+        //printf("KILL ME -> %d\n", word_category_table);
 
         if(tb.table_action[top_state.s_int][word_category_table][0] == 3){
 
@@ -1230,7 +1273,9 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** i
             else{
                 TreeNode** children = malloc(beta_non_epsilon_count*sizeof(TreeNode*));
                 for(int i=0;i<beta_non_epsilon_count;i++){
-                    int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE))+TREENODE_POS;
+                    //int s = dynarray_length(stack)-((i+1)*(DEFAULT_STACK_SIZE))+TREENODE_POS;
+                    assert(beta_non_epsilon_count>i);
+                    int s = get_stack_position(dynarray_length(stack), (beta_non_epsilon_count-1) - i, TREENODE_POS);
                     assert(s>0);
                     children[i] = (TreeNode*) stack[s].s_ptr;
                     //printf("MAYBE\n");
@@ -1245,7 +1290,54 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** i
 
                 free(children);
             }
-        
+
+            BuildUp build_rule = G.builds[prod_rule];
+            StackItem new_ast_node;
+            int stack_index;
+            switch (build_rule.type) {
+                case SHIFT:
+                    printf("SHIFT AST %d\n", build_rule.BuildUnion.shbuild.shift_coord);
+                    assert(beta_non_epsilon_count>build_rule.BuildUnion.shbuild.shift_coord);
+                    stack_index = get_stack_position(dynarray_length(stack), (beta_non_epsilon_count-1) - build_rule.BuildUnion.shbuild.shift_coord, AST_POS);
+                    assert(stack_index > 0);
+                    new_ast_node.ast_node = stack[stack_index].ast_node;
+                    break;
+                case APPEND:
+                    int stack_index_from = get_stack_position(dynarray_length(stack), (beta_non_epsilon_count-1) - build_rule.BuildUnion.apbuild.ap_from, AST_POS);
+                    int stack_index_to = get_stack_position(dynarray_length(stack), (beta_non_epsilon_count-1) - build_rule.BuildUnion.apbuild.ap_to, AST_POS);
+
+                    new_ast_node.ast_node = append_node(tm.arena, stack[stack_index_to].ast_node, &stack[stack_index_from].ast_node, 1);
+                    break;
+                case MAKE_NODE:
+                    printf("MAKE NODE AST\n");
+                    int children_amount = dynarray_length(build_rule.BuildUnion.mkbuild.coords);
+                    int nodetype = build_rule.BuildUnion.mkbuild.classification;
+                    ASTNode* ast_children = malloc(children_amount*sizeof(ASTNode));
+                    for(int i = 0;i<children_amount;i++){
+                        assert(beta_non_epsilon_count>build_rule.BuildUnion.mkbuild.coords[i]);
+                        stack_index = get_stack_position(dynarray_length(stack), (beta_non_epsilon_count-1) - build_rule.BuildUnion.mkbuild.coords[i], AST_POS);
+                        assert(stack_index > 0);
+                        ast_children[i] = stack[stack_index].ast_node;
+                    }
+                    new_ast_node.ast_node = create_node(tm.arena, nodetype, ast_children, children_amount);
+                    free(ast_children);
+                    break;
+                case BOX_NODE:
+                    printf("BOX NODE AST\n");
+                    int box_type = build_rule.BuildUnion.identifier;
+
+                    stack_index = get_stack_position(dynarray_length(stack), 0, AST_POS);
+                    assert(stack_index > 0);
+                    ASTNode current_label = stack[stack_index].ast_node;
+                    new_ast_node.ast_node = create_box(tm.arena, box_type, current_label);
+                    break;
+                case VALUE:
+                    int rule_value = build_rule.BuildUnion.identifier;
+                    new_ast_node.ast_node = create_value_box(tm.arena, rule_value);
+                    break;
+                default:
+                    assert(false);
+            }
 
             for(int i=0;i<(DEFAULT_STACK_SIZE)*beta_non_epsilon_count;i++){
                 StackItem trash;
@@ -1264,6 +1356,7 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** i
             new_state.s_int = to_state;
             
             dynarray_push(stack, new_node);
+            dynarray_push(stack, new_ast_node);
             dynarray_push(stack, new_token);
             dynarray_push(stack, new_state);
            
@@ -1273,22 +1366,24 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** i
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 2){
             int to_state = tb.table_action[top_state.s_int][word_category_table][1];
             
+            StackItem new_ast_node;
             StackItem new_node;
             StackItem new_token;
             StackItem new_state;
 
             TreeNode* tmp_node = tree_make_node(0, token_ptr->word, NULL);
-            
             //printf("TMP NODE");
             //print_node_info(tmp_node);
             
+            new_ast_node.ast_node = create_label(tm.arena, token_ptr->word, dynarray_length(token_ptr->word)-1);
             new_node.s_ptr = tmp_node;
             new_token.token.word = token_ptr->word;
             new_token.token.category = token_ptr->category;
 
             new_state.s_int = to_state;
-
+            
             dynarray_push(stack, new_node);
+            dynarray_push(stack, new_ast_node);
             dynarray_push(stack, new_token);
             dynarray_push(stack, new_state);
 
@@ -1310,12 +1405,17 @@ TreeNode* parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** i
         //printf("%s", token_ptr->word);
     } while(true);
 
-    TreeNode* root = (TreeNode*) stack[DEFAULT_STACK_SIZE].s_ptr;
+    int root_cst_index = get_stack_position(dynarray_length(stack),0,TREENODE_POS);
+    int root_ast_index = get_stack_position(dynarray_length(stack),0,AST_POS);
+    TreeNode* cst_root = (TreeNode*) stack[root_cst_index].s_ptr;
+    tm.root = stack[root_ast_index].ast_node;
 
     dynarray_destroy(stack);
     tree_destroy_node(first_node.s_ptr);
 
-    return root;
+    ParserOutput pout = {cst_root, tm};
+
+    return pout;
 }
 
 bool int_equal(void* a, void* b) {
@@ -1504,17 +1604,20 @@ int main(){
     fclose(file_lexer_seq);
 
     // --- 7. PARSER EXECUTION ---
-    TreeNode* root = parser_skeleton(G, tables_info, scanner_out, value_map);
+    ParserOutput par_out = parser_skeleton(G, tables_info, scanner_out, value_map);
 
     dynarray_destroy(scanner_out);
     destroy_tables(tables_info);
     free(value_map);
     dynadict_destroy(dict_map);
 
-    if (root) {
+    if (par_out.CST) {
         printf("\n--- Parse Tree ---\n");
-        print_tree(root, "", true, true);
+        print_tree(par_out.CST, "", true, true);
     }
+
+    printf("\n--- AST ---\n");
+    print_ast(par_out.AST.root, "", true);
 
     return 0;
 }
