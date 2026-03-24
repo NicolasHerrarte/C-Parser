@@ -70,8 +70,9 @@ void export_grammar(Grammar G, char** index_mapping, FILE* out);
 void print_grammar(Grammar G, char** index_mapping);
 Grammar create_grammar();
 Production create_production(int a, int* b, int b_count);
-Production destroy_production(Production* production);
+void destroy_production(Production* production);
+void destroy_buildUp(BuildUp* build);
 void destroy_grammar(Grammar* G);
-Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out, char *** value_src);
+Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out, Pair** pair_ptr, char *** value_src);
 
 char** storage_table_from_mapping(Pair* mapping, int map_size);

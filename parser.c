@@ -1528,6 +1528,11 @@ int main(){
 
     };
 
+    // All the dynadict and value map info for CST is stored HERE in the PAIRS!!
+    // All the strings for the CST are stored in the Token Sequence!!
+    // Every string in the ast mappings is stored in the AST PAIRS!!
+    // Everything in the AST is stored on its ARENA!!
+
     int symbols_amount = 74;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
@@ -1547,7 +1552,9 @@ int main(){
     FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
     
     char** ast_val_map;
-    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, file_rules_seq, &ast_val_map);
+    Pair* ast_mapping;
+
+    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, file_rules_seq, &ast_mapping, &ast_val_map);
     fclose(file_rules_seq);
     destroyDFATable(table_load);
 

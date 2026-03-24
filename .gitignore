@@ -6,6 +6,7 @@
 
 # Ignore all compiler-generated output
 output/*
+tables/*
 
 # Ignore executable files
 *.exe
