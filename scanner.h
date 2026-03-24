@@ -11,7 +11,7 @@
 #define FIN_PRIORITY 3
 #define MAX_PRIORITY 4
 
-#define EPSILON '@'
+#define EPSILON '\x01'
 
 #define len_nfa_states(fa) dynarray_length(fa.states)
 
@@ -22,6 +22,7 @@ typedef struct ScannerState{
     int input;
     int fence;
     char* buffer;
+    bool rollback;
 } ScannerState;
 
 typedef struct TableDFA{
@@ -46,6 +47,7 @@ typedef struct Transition{
     int state_from;
     int state_to;
     char trans_char;
+    bool epsilon_trans;
 } Transition;
 
 typedef struct FA{
@@ -86,7 +88,7 @@ void FA_add_acceptable_state(FA *fa, int acceptable_state, int category);
 bool FA_state_is_acceptable(FA fa, int state);
 int acceptable_states_mapping(char* c);
 
-Transition NFA_add_transition(FA *nfa, int _from, int _to, char _trans_char);
+Transition NFA_add_transition(FA *nfa, int _from, int _to, char _trans_char, bool empty_trans);
 Transition DFA_add_transition(FA *dfa, int _from, int _to, char _trans_char);
 
 int altercation(Fragment *left_fragment, Fragment *right_fragment, int *priority, int depth, int i);
@@ -109,8 +111,10 @@ void saveDFATable(TableDFA tables, char* directory);
 TableDFA loadDFATable(char* directory);
 void destroyDFATable(TableDFA table);
 long stream_len(FILE *stream);
+
+void export_buffer(char* buffer, int input, int fence, int n, FILE* out);
 Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_pos, ScannerState* sc, int n);
-Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore);
+Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore, char* debug_directory);
 
 TableDFA make_tables(char *src, char* out_dir, char* save_dir, bool debug);
 

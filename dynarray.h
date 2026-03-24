@@ -38,7 +38,7 @@ void _dynarray_reset(void *arr);
 
 #define dynarray_create(type) _dynarray_create(DYNARRAY_DEFAULT_CAP, sizeof(type))
 #define dynarray_create_prealloc(type, capacity) _dynarray_create(capacity, sizeof(type))
-#define dynarray_copy(arr) _dynarray_copy(arr)
+//#define dynarray_copy(arr) _dynarray_copy(arr)
 #define dynarray_destroy(arr) _dynarray_destroy(arr)
 
 #define dynarray_push(arr, x) arr = _dynarray_push(arr, &x)

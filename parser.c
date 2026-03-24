@@ -77,10 +77,6 @@ typedef struct TableMapping{
     int* symbols_mapping;
 } TableMapping;
 
-typedef struct Pair{
-    char* key;
-    int value;
-} Pair;
 
 void print_transition_single(LRTransition t, char** symbol_names) {
     printf("  State %d --( %s )--> State %d\n", 
@@ -1197,15 +1193,6 @@ Hash dictionary_from_mapping(Pair* mapping, int map_size){
     return dict_map;
 }
 
-char** storage_table_from_mapping(Pair* mapping, int map_size){
-    char** inverse_map = malloc(map_size * sizeof(char*));
-    for(int i=0;i<map_size;i++){
-        inverse_map[i] = mapping[i].key;
-    }
-
-    return inverse_map;
-}
-
 int get_stack_position(int stack_len, int element, int offset){
     return stack_len-((element+1)*(DEFAULT_STACK_SIZE))+offset;
 }
@@ -1310,8 +1297,14 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
                     break;
                 case MAKE_NODE:
                     printf("MAKE NODE AST\n");
-                    int children_amount = dynarray_length(build_rule.BuildUnion.mkbuild.coords);
+                    printf("Prod %d\n", prod_rule);
                     int nodetype = build_rule.BuildUnion.mkbuild.classification;
+
+                    if(build_rule.BuildUnion.mkbuild.coords == NULL){
+                        new_ast_node.ast_node = create_node(tm.arena, nodetype, NULL, 0);
+                        break;
+                    }
+                    int children_amount = dynarray_length(build_rule.BuildUnion.mkbuild.coords);
                     ASTNode* ast_children = malloc(children_amount*sizeof(ASTNode));
                     for(int i = 0;i<children_amount;i++){
                         assert(beta_non_epsilon_count>build_rule.BuildUnion.mkbuild.coords[i]);
@@ -1538,14 +1531,13 @@ int main(){
     int symbols_amount = 74;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
+
     bool generate_parsing_tables = true;
     bool generate_lexing_tables = false;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
-    char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])*)$02|///|$03|(//->)$04|//;$05|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
-    
-    //FA rules_regex = MakeFA(re_rules, "output/rules_dfa.txt", true);
+    char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])*)$02|///|$03|(//->)$04|//;$05|(//%%//)$06|(@sh)$07|(@ap)$08|(@mn)$09|(@bx)$10|(@vl)$11|(-/$(0|[1-9][0-9]*))$12|(-#)$13|((<([a-zA-Z_])([a-zA-Z_])*)>)$14|(/[(0|[1-9][0-9]*)/])$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
 
     if(generate_lexing_tables){
         TableDFA tmp1 = make_tables(re_rules, "output/rules_dfa.txt", "tables/grammar_transitions.sc", true);
@@ -1554,7 +1546,8 @@ int main(){
     TableDFA table_load = loadDFATable("tables/grammar_transitions.sc");
     FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
     
-    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, file_rules_seq);
+    char** ast_val_map;
+    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, file_rules_seq, &ast_val_map);
     fclose(file_rules_seq);
     destroyDFATable(table_load);
 
@@ -1565,7 +1558,7 @@ int main(){
     export_grammar(G, value_map, file_grammar);
     fclose(file_grammar);
 
-    //return 0;
+    return 0;
 
     if(generate_parsing_tables){
         printf("Tables Generated!\n");
@@ -1594,7 +1587,7 @@ int main(){
     
     TableDFA lexing_rules_table = loadDFATable("tables/lexer_transitions.sc");
 
-    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1);
+    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, "output/muncher.txt");
 
     destroyDFATable(lexing_rules_table);
 

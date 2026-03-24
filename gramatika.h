@@ -12,6 +12,14 @@ enum Instructions {
     VALUE
 };
 
+enum BuilderStates{
+    BASE_STATE,
+    ALPHA_STATE,
+    BETA_STATE,
+    BUILD_STATE,
+    ARGS_STATE,
+};
+
 typedef struct Production{
     int alpha;
     int* beta;
@@ -49,6 +57,11 @@ typedef struct Grammar{
     BuildUp* builds;
 } Grammar;
 
+typedef struct Pair{
+    char* key;
+    int value;
+} Pair;
+
 void export_production(Production prod, char** index_mapping, FILE* out);
 void print_production(Production prod, char** index_mapping);
 void export_build(BuildUp B, FILE* out);
@@ -59,4 +72,6 @@ Grammar create_grammar();
 Production create_production(int a, int* b, int b_count);
 Production destroy_production(Production* production);
 void destroy_grammar(Grammar* G);
-Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out);
+Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out, char *** value_src);
+
+char** storage_table_from_mapping(Pair* mapping, int map_size);

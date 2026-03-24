@@ -7,6 +7,8 @@
 #include "ast.h"
 
 ASTNode append_node(Arena* arena, ASTNode origin, ASTNode* children, int children_amount){
+    assert(children_amount > 0);
+    assert(children != NULL);
     ASTNode* children_storage = (ASTNode*) arena_get(arena, children_amount*sizeof(ASTNode));
     for(int i = 0;i<children_amount; i++){
         children_storage[i] = children[i];
@@ -54,6 +56,7 @@ ASTNode create_node(Arena* arena, int nodetype, ASTNode* children, int children_
     new_child.storage.node = node_storage;
     new_child.sibling = NULL;
     
+    if(children_amount == 0) {return new_child; }
     ASTNode appended_child = append_node(arena, new_child, children, children_amount);
 
     return appended_child;

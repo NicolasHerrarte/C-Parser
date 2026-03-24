@@ -1,3 +1,2 @@
-1=?true;
-x>4;
-false<=z;
+Init bool isFive;
+isFive = x =? 5;
