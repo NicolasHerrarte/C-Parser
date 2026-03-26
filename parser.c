@@ -1157,7 +1157,7 @@ void print_stack(StackItem* stack, char** index_mapping) {
             printf("%d ", (stack[i].ast_node.tag));
             switch (stack[i].ast_node.tag) {
                 case NODE:
-                    printf("NODE(type -> %d, children-> %d) ", stack[i].ast_node.storage.node->type, stack[i].ast_node.storage.node->amount_children);
+                    printf("NODE(%d) ", stack[i].ast_node.storage.node->type);
                     break;
                 case BOX:
                     Box* b = stack[i].ast_node.storage.box;
@@ -1565,7 +1565,7 @@ int main(){
     export_grammar(G, value_map, file_grammar);
     fclose(file_grammar);
 
-    return 0;
+    //return 0;
 
     if(generate_parsing_tables){
         printf("Tables Generated!\n");

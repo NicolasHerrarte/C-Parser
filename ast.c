@@ -23,11 +23,11 @@ ASTNode append_node(Arena* arena, ASTNode origin, ASTNode* children, int childre
         }
     }
 
-    if(origin.storage.node->amount_children == 0){
-        origin.storage.node->children = children_storage;
+    if(origin.storage.node->left_child == NULL){
+        origin.storage.node->left_child = children_storage;
     }
     else{
-        ASTNode* current = origin.storage.node->children; 
+        ASTNode* current = origin.storage.node->left_child; 
         int count = 1;
         while (current->sibling != NULL) {
             current = current->sibling;
@@ -35,11 +35,7 @@ ASTNode append_node(Arena* arena, ASTNode origin, ASTNode* children, int childre
         }
 
         current->sibling = children_storage;
-
-        assert(origin.storage.node->amount_children == count);
     }
-
-    origin.storage.node->amount_children += children_amount;
 
     return origin;
 }
@@ -49,8 +45,7 @@ ASTNode create_node(Arena* arena, int nodetype, ASTNode* children, int children_
     new_child.tag = NODE;
 
     InternalNode* node_storage = (InternalNode*) arena_get(arena, sizeof(InternalNode));
-    node_storage->children = NULL;
-    node_storage->amount_children = 0;
+    node_storage->left_child = NULL;
     node_storage->type = nodetype;
 
     new_child.storage.node = node_storage;
@@ -164,7 +159,7 @@ void print_ast(ASTNode node, char* prefix, bool is_last) {
                      prefix, is_last ? "    " : "│   ");
         }
 
-        ASTNode* current = internal->children; 
+        ASTNode* current = internal->left_child; 
 
         while (current != NULL) {
             // A node is the last child if it has no more siblings

@@ -32,9 +32,8 @@ enum ChildTag{
 };
 
 typedef struct InternalNode{
-    struct ASTNode* children;
+    struct ASTNode* left_child;
     int type;
-    int amount_children;
 } InternalNode;
 
 typedef struct Box{
