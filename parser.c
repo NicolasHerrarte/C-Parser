@@ -1488,8 +1488,8 @@ int main(){
         {"else",            34},
         {"while",           35},
         {"for",             36},
-        {"Init",            37},
-        {"Proc",            38},
+        {"init",            37},
+        {"proc",            38},
         {"return",          39},
         {"{",               40},
         {"}",               41},
@@ -1504,7 +1504,7 @@ int main(){
         {"string",          50},
         {"break",           51},
         {"continue",        52},
-        {"goto",            53},
+        {"assign",          53},
         {"Program",         54},
         {"Block",           55},
         {"CompStat",        56},
@@ -1525,7 +1525,9 @@ int main(){
         {"ParamsList",      71},
         {"SingleParam",     72},
         {"Identifier",      73},
-
+        {"ArrSize",         74},
+        {"Instantiation",   75},
+        {"ArrInst",         76},
     };
 
     // All the dynadict and value map info for CST is stored HERE in the PAIRS!!
@@ -1533,7 +1535,7 @@ int main(){
     // Every string in the ast mappings is stored in the AST PAIRS!!
     // Everything in the AST is stored on its ARENA!!
 
-    int symbols_amount = 74;
+    int symbols_amount = 77;
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
 
@@ -1583,7 +1585,7 @@ int main(){
 
     // --- 6. LEXER EXECUTION ---
     char* file_dir = "languaje.k";
-    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(Init)$37|(Proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(string)$50|(break)$51|(continue)$52|(goto)$53|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(init)$37|(proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(string)$50|(break)$51|(continue)$52|(assign)$53|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     int ignore_categories[] = {1};
 
     //FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
@@ -1594,6 +1596,7 @@ int main(){
     
     TableDFA lexing_rules_table = loadDFATable("tables/lexer_transitions.sc");
 
+    // THIS NEEDS TO BE FREED AFTER USE WITH LEXER AND STRINGS WITHIN
     Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, "output/muncher.txt");
 
     destroyDFATable(lexing_rules_table);
@@ -1611,6 +1614,7 @@ int main(){
     free(value_map);
     dynadict_destroy(dict_map);
 
+    // THERE IS NO CST DESTRUCTION YET
     if (par_out.CST) {
         printf("\n--- Parse Tree ---\n");
         print_tree(par_out.CST, "", true, true);
@@ -1619,5 +1623,6 @@ int main(){
     printf("\n--- AST ---\n");
     print_ast(par_out.AST.root, "", true);
 
+    // NEED TO SERIOUSLY FIND A BETTER WAY TO DISPLAY LOGS OMFG
     return 0;
 }

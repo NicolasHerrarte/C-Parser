@@ -229,6 +229,7 @@ bool buildup_lists_are_equal(BuildUp* list1, BuildUp* list2) {
 Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out, Pair** pair_ptr, char *** value_src){
     int ignore_categories[] = {1};
     Token* token_anchor = file_scan(rules_regex, file_lexing_rules, BUFFER_SIZE_GRAMMAR, ignore_categories, 1, "output/muncher_grammar.txt");
+    // THIS SEQUENCE NEEDS TO BE DESTROYED AFTER THE PAIRS ARE NO LONGER NEEDED
     Token* token = token_anchor;
 
     export_token_seq(token, out);
@@ -464,10 +465,14 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     SS_destroy(&terminals_ss);
 
     //dynarray_destroy(ast_pairs);
+    
     dynadict_destroy(ast_map);
+    // THIS ONLY DESTROYS DYNARRAY NOT SEQUENCE STRINGS WITHIN
+    // NEED TO ITERATE
     dynarray_destroy(token_anchor);
     dynarray_destroy(beta_memory);
     dynarray_destroy(build_args);
 
+    // AST PAIRS NEEDS TO BE USED AND DISCARDED LATER
     return G;
 }

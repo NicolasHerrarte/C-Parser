@@ -1,2 +1,3 @@
-Init bool isFive;
-isFive = x =? 5;
+proc add(a: int, b: int) -> int {
+    return a + b;
+}

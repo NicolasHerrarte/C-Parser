@@ -30,10 +30,16 @@ While           /-> while ( Expr ) Block                        /%%/ @mn -$2 -$4
 
 For             /-> for ( Stat ; Expr ; Stat ) Block            /%%/ @mn -$2 -$4 -$6 -$8 <ForNode> /;
 
-Declaration     /-> Init VarType Identifier                     /%%/ @mn -$1 -$2 <VarDecl> /;
-/|              /-> Init VarType Identifier <- Expr             /%%/ @mn -$1 -$2 -$4 <VarDecl> /;
+Declaration     /-> init VarType Identifier                     /%%/ @mn -$1 -$2 <VarDecl> /;
+/|              /-> init VarType Identifier <- Instantiation    /%%/ @mn -$1 -$2 -$4 <VarDecl> /;
 
-ProcDeclaration /-> Proc Identifier ( Params ) -> VarType Block /%%/ @mn -$1 -$3 -$6 -$7 <FuncDecl> /;
+Instantiation   /-> Expr                   			            /%%/ @sh -$0 /;
+/|        	    /-> ArrInst                    			        /%%/ @sh -$0 /;
+
+ArrInst         /-> assign Primitive [ ArrSize ]            	/%%/ @mn -$1 -$3 <ArrInst> /;
+/|        	    /-> ArrInst [ ArrSize ]               		    /%%/ @mn -$0 -$2 <ArrInst> /;
+
+ProcDeclaration /-> proc Identifier ( Params ) -> VarType Block /%%/ @mn -$1 -$3 -$6 -$7 <FuncDecl> /;
 
 Assignment      /-> Access = Expr                               /%%/ @mn -$0 -$2 <VarAssign> /;
 
@@ -49,7 +55,6 @@ Jump            /-> break                                       /%%/ @mn -# <Bre
 /|              /-> continue                                    /%%/ @mn -# <Continue> /;
 /|              /-> return                                      /%%/ @mn -# <Return> /;
 /|              /-> return Expr                                 /%%/ @mn -$1 <Return> /;
-/|              /-> goto Expr                                   /%%/ @mn -$1 <Goto> /;
 
 Args            /-> ArgList                                     /%%/ @sh -$0 /;
 /|              /-> Epsilon                                     /%%/ @mn -# <Arguments> /;
@@ -82,6 +87,8 @@ Factor          /-> Access                                      /%%/ @sh -$0 /;
 /|              /-> litstring                                   /%%/ @bx [2] /;
 /|              /-> true                                        /%%/ @bx [3] /;
 /|              /-> false                                       /%%/ @bx [4] /;
+
+ArrSize         /-> integer                                     /%%/ @bx [0] /;
 
 Access          /-> Access [ Expr ]                             /%%/ @mn -$0 -$2 <ArrAccess> /;
 /|              /-> Access ( Args )                             /%%/ @mn -$0 -$2 <FuncCall> /;
