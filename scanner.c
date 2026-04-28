@@ -250,7 +250,7 @@ int parenthesis(Fragment fragment, Fragment *left_fragment, bool *final_split, b
     return false;
 }
 
-Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state, bool recursion, bool debug){
+Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state, bool recursion, FILE* split_out){
     Fragment left_fragment = {fragment.start_index, fragment.start_index};
     Fragment right_fragment = {fragment.end_index, fragment.end_index};
 
@@ -263,12 +263,10 @@ Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state
 
     char acc_state_identifier = '\0';
 
-    if(debug){
-        for(int i = fragment.start_index;i<fragment.end_index;i++){
-            print_safe_char(str[i]);
-        }
-        printf("\n");
+    for(int i = fragment.start_index;i<fragment.end_index;i++){
+        export_safe_char(str[i], split_out);
     }
+    fprintf(split_out, "\n");
 
     if(fragment.start_index == fragment.end_index-1){
         int state_head = FA_next_state(nfa);
@@ -360,7 +358,7 @@ Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state
         if(final_split == true){
             switch(min_priority){
                 case CLOS_PRIORITY:
-                    Fragment nfa_only_fragment = find_split_point(nfa, str, left_fragment, 0, true, debug);
+                    Fragment nfa_only_fragment = find_split_point(nfa, str, left_fragment, 0, true, split_out);
 
                     int state_head_alt = FA_next_state(nfa);
                     int state_tail_alt = FA_next_state(nfa);
@@ -385,10 +383,10 @@ Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state
                     char_identifier[1] = str[left_fragment.end_index+2];
                     char_identifier[2] = '\0';
                     int num_state_identifier = acceptable_states_mapping(char_identifier);
-                    Fragment final_tag_fragment = find_split_point(nfa, str, left_fragment, num_state_identifier, true, debug);
+                    Fragment final_tag_fragment = find_split_point(nfa, str, left_fragment, num_state_identifier, true, split_out);
                     return final_tag_fragment;
                 case MAX_PRIORITY:
-                    Fragment same_fragment = find_split_point(nfa, str, left_fragment, 0, true, debug);
+                    Fragment same_fragment = find_split_point(nfa, str, left_fragment, 0, true, split_out);
                     if(final_state > 0){
                         FA_add_acceptable_state(nfa, same_fragment.end_index, final_state);
                     }
@@ -398,8 +396,8 @@ Fragment find_split_point(FA* nfa, char* str, Fragment fragment, int final_state
             }
         }
         else{
-            Fragment nfa_left_fragment = find_split_point(nfa, str, left_fragment, 0, true, debug);
-            Fragment nfa_right_fragment = find_split_point(nfa, str, right_fragment, 0, true, debug);
+            Fragment nfa_left_fragment = find_split_point(nfa, str, left_fragment, 0, true, split_out);
+            Fragment nfa_right_fragment = find_split_point(nfa, str, right_fragment, 0, true, split_out);
 
             switch(min_priority){
                 case ALT_PRIORITY:
@@ -762,35 +760,33 @@ void destroyDFATable(TableDFA table){
     free(table.trans_table);
 }
 
-void printTableDFA(TableDFA table) {
-    printf("\n--- DFA TRANSITION TABLE ---\n");
-    
-    printf("State | Acc |");
+void TableDFA_export(TableDFA table, FILE* out) {
+    fprintf(out, "State | Acc |");
     for (int c = 0; c < 256; c++) {
         for (int col = 0; col < table.alphabet_size; col++) {
             if (table.char_mapping[c] == col) {
-                if (c > 32 && c < 127) printf("  %c  ", c);
-                else printf(" 0x%02X", c);
+                if (c > 32 && c < 127) fprintf(out, "  %c  ", c);
+                else fprintf(out, " 0x%02X", c);
             }
         }
     }
-    printf("\n");
-    printf("----------------------------\n");
+    fprintf(out, "\n");
+    fprintf(out, "----------------------------\n");
 
     for (int s = 0; s < table.num_states; s++) {
-        printf("%5d | %3d |", s, table.acc_states[s]);
+        fprintf(out, "%5d | %3d |", s, table.acc_states[s]);
 
         for (int col = 0; col < table.alphabet_size; col++) {
             int target = table.trans_table[col][s];
             if (target == 0) {
-                printf("  .  ");
+                fprintf(out, "  .  ");
             } else {
-                printf("%3d  ", target);
+                fprintf(out, "%3d  ", target);
             }
         }
-        printf("\n");
+        fprintf(out, "\n");
     }
-    printf("----------------------------\n");
+    fprintf(out, "----------------------------\n");
 }
 
 long stream_len(FILE *stream) {
@@ -860,6 +856,7 @@ Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_
         int c = sc->buffer[sc->input];
         //printf("c-> %c\n", c);
         //printf("s-> %d\n", state);
+        //printf("l-> %d\n", dynarray_length(lexeme));
 
         sc->input = (sc->input + 1) % (2*n);
 
@@ -916,17 +913,19 @@ Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_
     sc->rollback = tmp_rollback;
 
     //printf("POS -> %d\n", *input_pos);
-    //if(true){
-        //for(int i = 0;i<dynarray_length(stack);i++){
-            //break;
+    if(true){
+        for(int i = 0;i<dynarray_length(stack);i++){
+            break;
             //printf("Stack: %d Pos: %d\n", stack[i].state, stack[i].pos);
-        //}
-    //}
+        }
+    }
+    
 
     //printf("State -> %d\n", state);
 
     while(state != BAD && table.acc_states[state] == 0){
         //printf("OMFG %d, %d\n", state, sc->fence);
+        //printf("l-> %d\n", dynarray_length(lexeme));
         failed_table[state][*input_pos] = true;
 
         //printf("FK %d\n", dynarray_length(stack));
@@ -953,10 +952,8 @@ Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_
 
     dynarray_destroy(stack);
 
-    char* lexeme_original = malloc(dynarray_length(lexeme)*sizeof(char)+1);
-    memcpy(lexeme_original, lexeme, dynarray_length(lexeme)*sizeof(char));
-    lexeme_original[dynarray_length(lexeme)] = '\0';
-    //printf("Lexeme -> %s\n", lexeme_original);
+    //printf("l-> %d\n", dynarray_length(lexeme));
+    //printf("DONE LOOP\n");
 
     //printf("state -> %d\n", state);
     if(state != BAD && table.acc_states[state] > 0){
@@ -966,37 +963,41 @@ Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_
         //printf("%s -> %d\n", lexeme, state);
 
         Token next_token = {lexeme, table.acc_states[state]};
-        free(lexeme_original);
         //printf("lexeme -> %s\n", lexeme);
         return next_token;
     }
     else{
-        printf("Lexing Error with word %s\n", lexeme_original);
+        char null_char = '\0';
+        dynarray_push(lexeme, null_char);
+        printf("Lexing Error with word %s\n", lexeme);
         assert(false);
     }
 }
 
-Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore, char* debug_directory){
+Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore, char* muncher_dir, char* finished_scan_dir){
     FILE* file_ptr = fopen(directory, "r");
+    assert(file_ptr != NULL);
+
     Token* token_list = dynarray_create(Token);
 
     ScannerState sc_state;
     sc_state.fence = 0;
     sc_state.input = 0;
-    sc_state.buffer = malloc(buffer_size * 2 * sizeof(char));
+    //sc_state.buffer = malloc(buffer_size * 2 * sizeof(char));
+    sc_state.buffer = calloc(buffer_size * 2, sizeof(char));
     sc_state.rollback = false;
 
     long file_size = stream_len(file_ptr)+2;
 
-    FILE* debug_out = fopen(debug_directory, "w");
-    export_buffer(sc_state.buffer, sc_state.input, sc_state.fence, buffer_size, debug_out);
+    FILE* muncher_out = fopen(muncher_dir, "w");
+    export_buffer(sc_state.buffer, sc_state.input, sc_state.fence, buffer_size, muncher_out);
 
     for(int i = 0; i < buffer_size; i++){
         int next_c = getc(file_ptr);
         sc_state.buffer[i] = (next_c == EOF) ? '\0' : (char) next_c;
     }
 
-    export_buffer(sc_state.buffer, sc_state.input, sc_state.fence, buffer_size, debug_out);
+    export_buffer(sc_state.buffer, sc_state.input, sc_state.fence, buffer_size, muncher_out);
 
     int input_pos = 0;
     
@@ -1005,16 +1006,15 @@ Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_c
         failed_table[i] = calloc(file_size, sizeof(bool));
     }
 
-    //printf("SIZE --- %d\n", file_size);
+    printf("SIZE --- %d\n", file_size);
 
     while(input_pos < file_size-2){
         Token token = next_word(table, file_ptr, failed_table, &input_pos, &sc_state, buffer_size);
 
         //printf("Marker -> %d, Position -> %d\n", marker, input_pos);
-        export_buffer(sc_state.buffer, sc_state.input, sc_state.fence, buffer_size, debug_out);
+        export_buffer(sc_state.buffer, sc_state.input, sc_state.fence, buffer_size, muncher_out);
         
         //printf("%d\n", strlen(token.word));
-        //printf("%d %d\n", last_input, input_pos);
         //printf("str: %s, cat: %d input: %d\n", token.word, token.category, input_pos);
         //printf("sc %d\n", sc_state.input);
 
@@ -1030,7 +1030,7 @@ Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_c
         }
     }
 
-    fclose(debug_out);
+    fclose(muncher_out);
 
     Token final_token;
     final_token.category = 0;
@@ -1046,57 +1046,88 @@ Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_c
     free(sc_state.buffer);
     fclose(file_ptr);
 
+    FILE* scan_out = fopen(finished_scan_dir, "w");
+    export_token_seq(token_list, scan_out);
+    fclose(scan_out);
+
     return token_list;
 }
 
-TableDFA make_tables(char *src, char* out_dir, char* save_dir, bool debug){
+TableDFA make_tables(char *src, char* save_table_dir, char* regex_logs_dir, char* split_logs_dir, char* nfa_logs_dir, char* dfa_logs_dir, char* table_logs_dir, bool debug){
     if(debug){
-        //printf("\ninitializing non finite automata...\n");
+        printf("Initializing non finite automata...\n");
     }
     FA nfa;
     FA_initialize(&nfa);
     if(debug){
-        //printf("\npreprocessign regex...\n\n");
+        printf("Preprocessign regex...\n");
     }
     char* regex = regex_prep(src);
     Fragment fragment_start = {0, strlen(regex)};
 
     if(debug){
-        //printf("Processsed Regex -> \n");
-        //printf("%s\n", regex);
-        //printf("\ncreating thomson's construction...\n\n");
+        printf("Creating nfa...\n");
     }
 
-    find_split_point(&nfa, regex, fragment_start, false, true, debug);
+    FILE* out_split = fopen(split_logs_dir, "w");
+    find_split_point(&nfa, regex, fragment_start, false, true, out_split);
+    fclose(out_split);
 
     if(debug){
-        printf("\nNFA -> \n");
-        FA_print(nfa);
-        printf("\nsubset creation to definite finite automata...\n\n");
+        printf("Converting to dfa...\n");
     }
     FA dfa = NtoDFA(nfa);
 
     if(debug){
-        printf("DFA -> \n");
-        FA_print(dfa);
+        printf("Constructing table...\n");
     }
 
-    FILE* out = fopen(out_dir, "w");
+    TableDFA table_construct = DFAtoTable(dfa);
 
-    fprintf(out, "--- Post Regex ---\n");
-    fprintf(out, "%s\n", regex);
-    fprintf(out, "\nNFA -> \n");
-    FA_export(nfa, out);
-    fprintf(out, "\nDFA -> \n");
-    FA_export(dfa, out);
-    fclose(out);
+    if(debug){
+        printf("Saving table in %s...\n", save_table_dir);
+    }
+
+    saveDFATable(table_construct, save_table_dir);
+
+    if(debug){
+        printf("Saving logs...\n");
+    }
+
+    FILE* out_regex = fopen(regex_logs_dir, "w");
+    fprintf(out_regex, "%s\n", regex);
+    fclose(out_regex);
+
+    FILE* out_nfa = fopen(nfa_logs_dir, "w");
+    FA_export(nfa, out_nfa);
+    fclose(out_nfa);
+
+    FILE* out_dfa = fopen(dfa_logs_dir, "w");
+    FA_export(dfa, out_dfa);
+    fclose(out_dfa);
+
+    FILE* out_table = fopen(table_logs_dir, "w");
+    TableDFA_export(table_construct, out_table);
+    fclose(out_table);
+
+    if(debug){
+        printf("Releasing memory...\n");
+    }
 
     FA_destroy(&nfa);
     dynarray_destroy(regex);
 
-    TableDFA table_construct = DFAtoTable(dfa);
     FA_destroy(&dfa);
-    saveDFATable(table_construct, save_dir);
+
+    if(debug){
+        printf("Done!\n");
+    }
 
     return table_construct;
+}
+
+void destroy_token_sequence(Token* sequence){
+    for(int i = 0; i<dynarray_length(sequence)-1;i++){
+        dynarray_destroy(sequence[i].word);
+    }
 }

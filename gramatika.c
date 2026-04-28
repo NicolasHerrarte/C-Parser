@@ -228,7 +228,7 @@ bool buildup_lists_are_equal(BuildUp* list1, BuildUp* list2) {
 
 Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, FILE* out, Pair** pair_ptr, char *** value_src){
     int ignore_categories[] = {1};
-    Token* token_anchor = file_scan(rules_regex, file_lexing_rules, BUFFER_SIZE_GRAMMAR, ignore_categories, 1, "output/muncher_grammar.txt");
+    Token* token_anchor = file_scan(rules_regex, file_lexing_rules, BUFFER_SIZE_GRAMMAR, ignore_categories, 1, "lexer/logs/rules/muncher_grammar.txt", "lexer/logs/rules/token_list.txt");
     // THIS SEQUENCE NEEDS TO BE DESTROYED AFTER THE PAIRS ARE NO LONGER NEEDED
     Token* token = token_anchor;
 
@@ -246,6 +246,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     Hash ast_map = dynadict_create(512, int);
     Pair* ast_pairs = dynarray_create(Pair);
     int pairs_count = 0;
+    int token_count = 1;
 
     int* build_args = dynarray_create(int);
     bool empty_args = false;
@@ -443,10 +444,11 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
         }
 
         else{
-            printf("Rules Synthax Error State->%d Category->%d Word->%s\n", state, token->category, token->word);
+            printf("Rules Synthax Error State->%d Category->%d Word->%s Rule -> %d\n", state, token->category, token->word, token_count);
             assert(false);
         }
 
+        token_count ++;
         token ++;
     }
 

@@ -14,7 +14,7 @@
 #include "ast.h"
 
 #define DEFAULT_STACK_SIZE 4
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 500
 
 enum {
     END,
@@ -1539,18 +1539,19 @@ int main(){
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
 
-    bool generate_parsing_tables = true;
-    bool generate_lexing_tables = false;
+    bool generate_parsing_tables = false;
+    bool generate_lexing_tables = true;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
-    char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:])*)$02|///|$03|(//->)$04|//;$05|(//%%//)$06|(@sh)$07|(@ap)$08|(@mn)$09|(@bx)$10|(@vl)$11|(-/$(0|[1-9][0-9]*))$12|(-#)$13|((<([a-zA-Z_])([a-zA-Z_])*)>)$14|(/[(0|[1-9][0-9]*)/])$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])*)$02|///|$03|(//->)$04|//;$05|(//%%//)$06|(@sh)$07|(@ap)$08|(@mn)$09|(@bx)$10|(@vl)$11|(-/$(0|[1-9][0-9]*))$12|(-#)$13|((<([a-zA-Z_])([a-zA-Z_])*)>)$14|(/[(0|[1-9][0-9]*)/])$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
 
     if(generate_lexing_tables){
-        TableDFA tmp1 = make_tables(re_rules, "output/rules_dfa.txt", "tables/grammar_transitions.sc", true);
+        printf("--- Generating rules lexer ---\n");
+        TableDFA tmp1 = make_tables(re_rules, "lexer/tables/rules_transitions.sc", "lexer/logs/rules/regex_logs.txt", "lexer/logs/rules/split_logs.txt", "lexer/logs/rules/nfa_logs.txt", "lexer/logs/rules/dfa_logs.txt", "lexer/logs/rules/table_logs.txt",true);
         destroyDFATable(tmp1);
     }
-    TableDFA table_load = loadDFATable("tables/grammar_transitions.sc");
+    TableDFA table_load = loadDFATable("lexer/tables/rules_transitions.sc");
     FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
     
     char** ast_val_map;
@@ -1585,21 +1586,24 @@ int main(){
 
     // --- 6. LEXER EXECUTION ---
     char* file_dir = "languaje.k";
-    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$25|(true)$26|(false)$27|(if)$33|(else)$34|(while)$35|(for)$36|(init)$37|(proc)$38|(return)$39|({)$40|(})$41|(;)$42|(<-)$43|(=)$44|(:)$45|(->)$46|(int)$47|(bool)$48|(float)$49|(string)$50|(break)$51|(continue)$52|(assign)$53|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|(/|/|)$25|(&&)$26|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$27|(true)$28|(false)$29|(if)$35|(else)$36|(while)$37|(for)$38|(init)$39|(proc)$40|(return)$41|({)$42|(})$43|(;)$44|(<-)$45|(=)$46|(:)$47|(->)$48|(int)$49|(bool)$50|(float)$51|(string)$52|(void)$53|(break)$54|(continue)$55|(assign)$56|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
     int ignore_categories[] = {1};
 
     //FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
     if(generate_lexing_tables){
-        TableDFA tmp2 = make_tables(lexing_rules, "output/lexer_dfa.txt", "tables/lexer_transitions.sc", true);
+        printf("--- Generating language lexer ---\n");
+        TableDFA tmp2 = make_tables(lexing_rules, "lexer/tables/language_transitions.sc", "lexer/logs/language/regex_logs.txt", "lexer/logs/language/split_logs.txt", "lexer/logs/language/nfa_logs.txt", "lexer/logs/language/dfa_logs.txt", "lexer/logs/language/table_logs.txt", true);
         destroyDFATable(tmp2);
     }
     
-    TableDFA lexing_rules_table = loadDFATable("tables/lexer_transitions.sc");
+    TableDFA lexing_rules_table = loadDFATable("lexer/tables/language_transitions.sc");
 
     // THIS NEEDS TO BE FREED AFTER USE WITH LEXER AND STRINGS WITHIN
-    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, "output/muncher.txt");
+    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, "lexer/logs/language/muncher.txt", "lexer/logs/language/token_list.txt");
 
     destroyDFATable(lexing_rules_table);
+
+    return 0;
 
     print_token_seq(scanner_out);
     FILE* file_lexer_seq = fopen("output/lexer_seq.txt", "w");
