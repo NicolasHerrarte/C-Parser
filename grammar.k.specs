@@ -34,22 +34,25 @@ Declaration     /-> init VarType Identifier                     /%%/ @mn -$1 -$2
 /|              /-> init VarType Identifier <- Instantiation    /%%/ @mn -$1 -$2 -$4 <VarDecl> /;
 
 Instantiation   /-> Expr                   			            /%%/ @sh -$0 /;
-/|        	    /-> ArrInst                    			        /%%/ @sh -$0 /;
+/|        	    /-> StorageAssign                    		    /%%/ @sh -$0 /;
 
-ArrInst         /-> assign Primitive [ ArrSize ]            	/%%/ @mn -$1 -$3 <ArrInst> /;
+StorageAssign   /-> assign ArrInst				                /%%/ @mn -$1 <AssignStorage> /;
+
+ArrInst         /-> Primitive [ ArrSize ]            	        /%%/ @mn -$0 -$2 <ArrInst> /;
 /|        	    /-> ArrInst [ ArrSize ]               		    /%%/ @mn -$0 -$2 <ArrInst> /;
 
 ProcDeclaration /-> proc Identifier ( Params ) -> VarType Block /%%/ @mn -$1 -$3 -$6 -$7 <FuncDecl> /;
 
 Assignment      /-> Access = Expr                               /%%/ @mn -$0 -$2 <VarAssign> /;
 
-VarType         /-> Primitive                                   /%%/ @sh -$0 /;
+VarType         /-> Primitive                                   /%%/ @mn -$0 <PrimitiveType> /;
 /|              /-> VarType [ ]                                 /%%/ @mn -$0 <ArrType> /;
 
 Primitive       /-> int                                         /%%/ @vl [0] /;
 /|              /-> bool                                        /%%/ @vl [1] /;
 /|              /-> float                                       /%%/ @vl [2] /;
 /|              /-> string                                      /%%/ @vl [3] /;
+/|              /-> void                                        /%%/ @vl [4] /;
 
 Jump            /-> break                                       /%%/ @mn -# <Break> /;
 /|              /-> continue                                    /%%/ @mn -# <Continue> /;
@@ -70,7 +73,13 @@ ParamsList      /-> ParamsList , SingleParam                    /%%/ @ap -$0 -$2
 
 SingleParam     /-> Identifier : VarType                        /%%/ @mn -$0 -$2 <UniParam> /;
 
-Expr            /-> Expr LoP Eval                               /%%/ @mn -$0 -$1 -$2 <Expression> /;
+Expr            /-> Expr || LogAnd                              /%%/ @mn -$0 -$2 <LogicOr> /;
+/|              /-> LogAnd                                      /%%/ @sh -$0 /;
+
+LogAnd		    /-> LogAnd && Relation				            /%%/ @mn -$0 -$2 <LogicAnd> /;
+/|		        /-> Relation					                /%%/ @sh -$0 /;
+
+Relation        /-> Relation RelOp Eval                         /%%/ @mn -$0 -$1 -$2 <CompNode> /;
 /|              /-> Eval                                        /%%/ @sh -$0 /;
 
 Eval            /-> Eval + Term                                 /%%/ @mn -$0 -$2 <Sum> /;
@@ -100,7 +109,7 @@ AccessBase      /-> Identifier                                  /%%/ @sh -$0 /;
 
 Identifier      /-> name                                        /%%/ @bx [5] /;
 
-LoP             /-> =?                                          /%%/ @vl [0] /;
+RelOp           /-> =?                                          /%%/ @vl [0] /;
 /|              /-> >=                                          /%%/ @vl [1] /;
 /|              /-> <=                                          /%%/ @vl [2] /;
 /|              /-> >                                           /%%/ @vl [3] /;

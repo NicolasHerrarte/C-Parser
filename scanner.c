@@ -4,10 +4,16 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
+
 #include "dynarray.h"
 #include "re_pp.h"
 #include "subset.h"
 #include "scanner.h"
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 void export_safe_char(char c, FILE* out) {
     switch (c) {
@@ -974,7 +980,7 @@ Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_
     }
 }
 
-Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore, char* muncher_dir, char* finished_scan_dir){
+Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore, char* logs_dir){
     FILE* file_ptr = fopen(directory, "r");
     assert(file_ptr != NULL);
 
@@ -989,6 +995,8 @@ Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_c
 
     long file_size = stream_len(file_ptr)+2;
 
+    char muncher_dir[PATH_MAX];
+    snprintf(muncher_dir, sizeof(muncher_dir), "%s/%s", logs_dir, "muncher_log.txt");
     FILE* muncher_out = fopen(muncher_dir, "w");
     export_buffer(sc_state.buffer, sc_state.input, sc_state.fence, buffer_size, muncher_out);
 
@@ -1006,7 +1014,7 @@ Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_c
         failed_table[i] = calloc(file_size, sizeof(bool));
     }
 
-    printf("SIZE --- %d\n", file_size);
+    //printf("SIZE --- %d\n", file_size);
 
     while(input_pos < file_size-2){
         Token token = next_word(table, file_ptr, failed_table, &input_pos, &sc_state, buffer_size);
@@ -1046,14 +1054,16 @@ Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_c
     free(sc_state.buffer);
     fclose(file_ptr);
 
-    FILE* scan_out = fopen(finished_scan_dir, "w");
+    char token_list_dir[PATH_MAX];
+    snprintf(token_list_dir, sizeof(token_list_dir), "%s/%s", logs_dir, "token_list_log.txt");
+    FILE* scan_out = fopen(token_list_dir, "w");
     export_token_seq(token_list, scan_out);
     fclose(scan_out);
 
     return token_list;
 }
 
-TableDFA make_tables(char *src, char* save_table_dir, char* regex_logs_dir, char* split_logs_dir, char* nfa_logs_dir, char* dfa_logs_dir, char* table_logs_dir, bool debug){
+TableDFA make_tables(char *src, char* save_table_dir, char* logs_dir, bool debug){
     if(debug){
         printf("Initializing non finite automata...\n");
     }
@@ -1069,6 +1079,8 @@ TableDFA make_tables(char *src, char* save_table_dir, char* regex_logs_dir, char
         printf("Creating nfa...\n");
     }
 
+    char split_logs_dir[PATH_MAX];
+    snprintf(split_logs_dir, sizeof(split_logs_dir), "%s/%s", logs_dir, "split_log.txt");
     FILE* out_split = fopen(split_logs_dir, "w");
     find_split_point(&nfa, regex, fragment_start, false, true, out_split);
     fclose(out_split);
@@ -1094,18 +1106,26 @@ TableDFA make_tables(char *src, char* save_table_dir, char* regex_logs_dir, char
         printf("Saving logs...\n");
     }
 
+    char regex_logs_dir[PATH_MAX];
+    snprintf(regex_logs_dir, sizeof(regex_logs_dir), "%s/%s", logs_dir, "regex_log.txt");
     FILE* out_regex = fopen(regex_logs_dir, "w");
     fprintf(out_regex, "%s\n", regex);
     fclose(out_regex);
 
+    char nfa_logs_dir[PATH_MAX];
+    snprintf(nfa_logs_dir, sizeof(nfa_logs_dir), "%s/%s", logs_dir, "nfa_log.txt");
     FILE* out_nfa = fopen(nfa_logs_dir, "w");
     FA_export(nfa, out_nfa);
     fclose(out_nfa);
 
+    char dfa_logs_dir[PATH_MAX];
+    snprintf(dfa_logs_dir, sizeof(dfa_logs_dir), "%s/%s", logs_dir, "dfa_log.txt");
     FILE* out_dfa = fopen(dfa_logs_dir, "w");
     FA_export(dfa, out_dfa);
     fclose(out_dfa);
 
+    char table_logs_dir[PATH_MAX];
+    snprintf(table_logs_dir, sizeof(table_logs_dir), "%s/%s", logs_dir, "table_log.txt");
     FILE* out_table = fopen(table_logs_dir, "w");
     TableDFA_export(table_construct, out_table);
     fclose(out_table);

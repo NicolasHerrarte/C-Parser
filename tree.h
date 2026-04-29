@@ -10,6 +10,9 @@ typedef struct TreeNode{
 } TreeNode;
 
 TreeNode* tree_make_node(int amount_nodes, char* name, TreeNode** nodes);
-void print_tree(TreeNode* node, char* prefix, bool is_last, bool is_root);;
+void print_tree(TreeNode* node, char* prefix, bool is_last, bool is_root);
+void export_tree(FILE* stream_out, TreeNode* node, char* prefix, bool is_last, bool is_root) ;
 void print_node_info(TreeNode* node);
+void export_node_info(FILE* stream_out, TreeNode* node);
 void tree_destroy_node(TreeNode* node);
+void destroy_tree(TreeNode* node);

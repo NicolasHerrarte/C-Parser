@@ -4,7 +4,6 @@
 
 #include "subset.h"
 
-
 #define ALT_PRIORITY 0
 #define CONCAT_PRIORITY 1
 #define CLOS_PRIORITY 2
@@ -115,8 +114,8 @@ long stream_len(FILE *stream);
 
 void export_buffer(char* buffer, int input, int fence, int n, FILE* out);
 Token next_word(TableDFA table, FILE* file_ptr, bool** failed_table, int* input_pos, ScannerState* sc, int n);
-Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore, char* muncher_dir, char* finished_scan_dir);
+Token* file_scan(TableDFA table, char* directory, int buffer_size, int* ignore_cats, int amount_ignore, char* logs_dir);
 
-TableDFA make_tables(char *src, char* save_table_dir, char* regex_logs_dir, char* split_logs_dir, char* nfa_logs_dir, char* dfa_logs_dir, char* table_logs_dir, bool debug);
+TableDFA make_tables(char *src, char* save_table_dir, char* logs_dir, bool debug);
 void destroy_token_sequence(Token* sequence);
 

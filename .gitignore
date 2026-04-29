@@ -10,6 +10,8 @@ tables/*
 
 lexer/tables/*
 lexer/logs/*
+parser/logs/*
+parser/tables/*
 
 # Ignore executable files
 *.exe

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
+#include <limits.h>
 #include "dynarray.h"
 #include "subset.h"
 #include "hash.h"
@@ -12,6 +13,10 @@
 #include "tree.h"
 #include "gramatika.h"
 #include "ast.h"
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 #define DEFAULT_STACK_SIZE 4
 #define BUFFER_SIZE 500
@@ -1020,8 +1025,8 @@ TableMapping create_tables(Grammar G, TableMaterial tb){
     SS_destroy(&counted);
 
     //printf("--- Counts ---\n");
-    printf("T: %d, NT: %d\n", t_count, nt_count);
-    printf("FUCK T: %d, NT: %d\n", t_length, nt_length);
+    //printf("T: %d, NT: %d\n", t_count, nt_count);
+    //printf("FUCK T: %d, NT: %d\n", t_length, nt_length);
     //printf("--- Actions ---\n");
 
     int*** table_action = malloc(states_count * sizeof(int**));
@@ -1224,11 +1229,11 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
     do{
         StackItem top_state = dynarray_get_last(stack);
 
-        printf("--- Iteration ---\n");
-        printf("Current Word: %s\n", index_mapping[token_ptr->category]);
-        printf("Current Cat: %d\n", token_ptr->category);
-        printf("Current State: %d\n", top_state.s_int);
-        print_stack(stack, index_mapping);
+        //printf("--- Iteration ---\n");
+        //printf("Current Word: %s\n", index_mapping[token_ptr->category]);
+        //printf("Current Cat: %d\n", token_ptr->category);
+        //printf("Current State: %d\n", top_state.s_int);
+        //print_stack(stack, index_mapping);
 
         int word_category_table = tb.symbols_mapping[token_ptr->category];
 
@@ -1283,7 +1288,7 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
             int stack_index;
             switch (build_rule.type) {
                 case SHIFT:
-                    printf("SHIFT AST %d\n", build_rule.BuildUnion.shbuild.shift_coord);
+                    //printf("SHIFT AST %d\n", build_rule.BuildUnion.shbuild.shift_coord);
                     assert(beta_non_epsilon_count>build_rule.BuildUnion.shbuild.shift_coord);
                     stack_index = get_stack_position(dynarray_length(stack), (beta_non_epsilon_count-1) - build_rule.BuildUnion.shbuild.shift_coord, AST_POS);
                     assert(stack_index > 0);
@@ -1296,8 +1301,8 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
                     new_ast_node.ast_node = append_node(tm.arena, stack[stack_index_to].ast_node, &stack[stack_index_from].ast_node, 1);
                     break;
                 case MAKE_NODE:
-                    printf("MAKE NODE AST\n");
-                    printf("Prod %d\n", prod_rule);
+                    //printf("MAKE NODE AST\n");
+                    //printf("Prod %d\n", prod_rule);
                     int nodetype = build_rule.BuildUnion.mkbuild.classification;
 
                     if(build_rule.BuildUnion.mkbuild.coords == NULL){
@@ -1316,7 +1321,7 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
                     free(ast_children);
                     break;
                 case BOX_NODE:
-                    printf("BOX NODE AST\n");
+                    //printf("BOX NODE AST\n");
                     int box_type = build_rule.BuildUnion.identifier;
 
                     stack_index = get_stack_position(dynarray_length(stack), 0, AST_POS);
@@ -1337,9 +1342,9 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
                 dynarray_pop(stack, &trash);
             }
             
-            printf("stack get %d\n", dynarray_get_last(stack).s_int);
-            printf("already_mapped %d\n", tb.symbols_mapping[A]);
-            printf("A %d\n", A);
+            //printf("stack get %d\n", dynarray_get_last(stack).s_int);
+            //printf("already_mapped %d\n", tb.symbols_mapping[A]);
+            //printf("A %d\n", A);
             int to_state = tb.table_goto[dynarray_get_last(stack).s_int][tb.symbols_mapping[A]];
             
             StackItem new_node;
@@ -1354,7 +1359,7 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
             dynarray_push(stack, new_state);
            
             
-            printf("Reduce -> %d\n", prod_rule+1); 
+            //printf("Reduce -> %d\n", prod_rule+1); 
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 2){
             int to_state = tb.table_action[top_state.s_int][word_category_table][1];
@@ -1384,7 +1389,7 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
 
             token_ptr++;
 
-            printf("Shift -> %d\n", to_state);
+            //printf("Shift -> %d\n", to_state);
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 1){
             printf("Accept\n");
@@ -1416,39 +1421,67 @@ bool int_equal(void* a, void* b) {
 }
 
 
-TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules, char** value_map) {
+TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules, char** value_map, char* save_table_dir, char* parser_logs_dir, bool debug) {
+    
+    if(debug){
+        printf("Generating first sets...\n");
+    }
     Subset* first = generate_first(G);
     
+    char first_logs_dir[PATH_MAX];
+    snprintf(first_logs_dir, sizeof(first_logs_dir), "%s/%s", parser_logs_dir, "first_set_logs.txt");
     FILE* file_first = fopen("output/first_sets.txt", "w");
-    if (file_first) {
-        export_first_sets(G, first, value_map, file_first);
-        fclose(file_first);
-    }
 
+    assert(file_first);
+    export_first_sets(G, first, value_map, file_first);
+    fclose(file_first);
+
+    if(debug){
+        printf("Generating collection sets...\n");
+    }
+    
     TableMaterial table_material = c_collection(G, first);
     destroy_first(G, first);
 
-    FILE* file_collection = fopen("output/collection.txt", "w");
-    if (file_collection) {
-        export_canonical_collection(table_material.CC, value_map, file_collection);
-        fprintf(file_collection, "\n\n\n");
-        export_transition_list(table_material.goto_transitions, value_map, file_collection);
-        fclose(file_collection);
+    char collection_states_logs_dir[PATH_MAX];
+    snprintf(collection_states_logs_dir, sizeof(collection_states_logs_dir), "%s/%s", parser_logs_dir, "collection_states_logs.txt");
+    FILE* file_collection_states = fopen(collection_states_logs_dir, "w");
+
+    assert(file_collection_states);
+    export_canonical_collection(table_material.CC, value_map, file_collection_states);
+    fclose(file_collection_states);
+
+    char collection_trans_logs_dir[PATH_MAX];
+    snprintf(collection_trans_logs_dir, sizeof(collection_trans_logs_dir), "%s/%s", parser_logs_dir, "collection_transitions_logs.txt");
+    FILE* file_collection_trans = fopen(collection_trans_logs_dir, "w");
+
+    assert(file_collection_trans);
+    export_transition_list(table_material.goto_transitions, value_map, file_collection_trans);
+    fclose(file_collection_trans);
+
+    if(debug){
+        printf("Generating action and goto tables...\n");
     }
 
     TableMapping tables_info = create_tables(G, table_material);
     
-    FILE* file_tables = fopen("output/parser_tables.txt", "w");
+    char parse_tables_logs_dir[PATH_MAX];
+    snprintf(parse_tables_logs_dir, sizeof(parse_tables_logs_dir), "%s/%s", parser_logs_dir, "action_goto_tables_logs.txt");
+    FILE* file_tables = fopen(parse_tables_logs_dir, "w");
     export_tables(&tables_info, file_tables);
     fclose(file_tables);
 
-    save_parsing_tables(&tables_info, "tables/text_tables.txt");
+    if(debug){
+        printf("Exporting tables and logs...\n");
+    }
+
+    save_parsing_tables(&tables_info, save_table_dir);
     return tables_info;
 }
 
 
 int main(){
-    printf("Parser...\n");
+    printf("Initializing Parser...\n");
 
     Pair mapping[] = {
         {"End",             0},
@@ -1476,113 +1509,131 @@ int main(){
         {"<=",              22},
         {">",               23},
         {"<",               24},
-        {"litstring",       25},
-        {"true",            26},
-        {"false",           27},
-        {"Access",          28},
-        {"AccessBase",      29},
-        {"LoP",             30},
-        {"Args",            31},
-        {"ArgList",         32},
-        {"if",              33}, 
-        {"else",            34},
-        {"while",           35},
-        {"for",             36},
-        {"init",            37},
-        {"proc",            38},
-        {"return",          39},
-        {"{",               40},
-        {"}",               41},
-        {";",               42},
-        {"<-",              43},
-        {"=",               44},
-        {":",               45},
-        {"->",              46},
-        {"int",             47},
-        {"bool",            48},
-        {"float",           49},
-        {"string",          50},
-        {"break",           51},
-        {"continue",        52},
-        {"assign",          53},
-        {"Program",         54},
-        {"Block",           55},
-        {"CompStat",        56},
-        {"UnitStat",        57},
-        {"ControlStat",     58},
-        {"Stat",            59},
-        {"CondStat",        60},
-        {"LoopStat",        61},
-        {"While",           62},
-        {"For",             63},
-        {"Declaration",     64},
-        {"ProcDeclaration", 65},
-        {"Assignment",      66},
-        {"VarType",         67},
-        {"Primitive",       68},
-        {"Jump",            69},
-        {"Params",          70},
-        {"ParamsList",      71},
-        {"SingleParam",     72},
-        {"Identifier",      73},
-        {"ArrSize",         74},
-        {"Instantiation",   75},
-        {"ArrInst",         76},
+        {"||",              25},
+        {"&&",              26},
+        {"litstring",       27},
+        {"true",            28},
+        {"false",           29},
+        {"Access",          30},
+        {"AccessBase",      31},
+        {"RelOp",           32},
+        {"Args",            33},
+        {"ArgList",         34},
+        {"if",              35}, 
+        {"else",            36},
+        {"while",           37},
+        {"for",             38},
+        {"init",            39},
+        {"proc",            40},
+        {"return",          41},
+        {"{",               42},
+        {"}",               43},
+        {";",               44},
+        {"<-",              45},
+        {"=",               46},
+        {":",               47},
+        {"->",              48},
+        {"int",             49},
+        {"bool",            50},
+        {"float",           51},
+        {"string",          52},
+        {"void",            53},
+        {"break",           54},
+        {"continue",        55},
+        {"assign",          56},
+        {"Program",         57},
+        {"Block",           58},
+        {"CompStat",        59},
+        {"UnitStat",        60},
+        {"ControlStat",     61},
+        {"Stat",            62},
+        {"CondStat",        63},
+        {"LoopStat",        64},
+        {"While",           65},
+        {"For",             66},
+        {"Declaration",     67},
+        {"ProcDeclaration", 68},
+        {"Assignment",      69},
+        {"VarType",         70},
+        {"Primitive",       71},
+        {"Jump",            72},
+        {"Params",          73},
+        {"ParamsList",      74},
+        {"SingleParam",     75},
+        {"Identifier",      76},
+        {"ArrSize",         77},
+        {"Instantiation",   78},
+        {"ArrInst",         79},
+        {"StorageAssign",   80},
+        {"Relation",        81},
+        {"LogAnd",          82},
     };
 
     // All the dynadict and value map info for CST is stored HERE in the PAIRS!!
     // All the strings for the CST are stored in the Token Sequence!!
-    // Every string in the ast mappings is stored in the AST PAIRS!!
+    // Every string in the ast value mappings is stored in the AST PAIRS!!
     // Everything in the AST is stored on its ARENA!!
 
-    int symbols_amount = 77;
+    char* rules_logs_dir = "lexer/logs/rules";
+    char* language_logs_dir = "lexer/logs/language";
+    char* parser_logs_dir = "parser/logs";
+
+    int symbols_amount = 83;
+
+    printf("Setting mappings...\n");
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
 
     bool generate_parsing_tables = false;
-    bool generate_lexing_tables = true;
+    bool generate_lexing_tables = false;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
     char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])*)$02|///|$03|(//->)$04|//;$05|(//%%//)$06|(@sh)$07|(@ap)$08|(@mn)$09|(@bx)$10|(@vl)$11|(-/$(0|[1-9][0-9]*))$12|(-#)$13|((<([a-zA-Z_])([a-zA-Z_])*)>)$14|(/[(0|[1-9][0-9]*)/])$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
 
     if(generate_lexing_tables){
-        printf("--- Generating rules lexer ---\n");
-        TableDFA tmp1 = make_tables(re_rules, "lexer/tables/rules_transitions.sc", "lexer/logs/rules/regex_logs.txt", "lexer/logs/rules/split_logs.txt", "lexer/logs/rules/nfa_logs.txt", "lexer/logs/rules/dfa_logs.txt", "lexer/logs/rules/table_logs.txt",true);
+        printf("--- Rules Lexer ---\n");
+        TableDFA tmp1 = make_tables(re_rules, "lexer/tables/rules_transitions.sc", rules_logs_dir, true);
         destroyDFATable(tmp1);
+        printf("--- Finished ---\n");
     }
+    printf("Loading rules lexer...\n");
     TableDFA table_load = loadDFATable("lexer/tables/rules_transitions.sc");
-    FILE* file_rules_seq = fopen("output/rules_seq.txt", "w");
     
     char** ast_val_map;
     Pair* ast_mapping;
 
-    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, file_rules_seq, &ast_mapping, &ast_val_map);
-    fclose(file_rules_seq);
+    printf("--- Gramatika Creation ---\n");
+
+    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, &ast_mapping, &ast_val_map, rules_logs_dir, true);
     destroyDFATable(table_load);
 
+    printf("--- Finished ---\n");
 
     // Export Grammar
-    print_grammar(G, value_map);
-    FILE* file_grammar = fopen("output/grammar.txt", "w");
+    //print_grammar(G, value_map);
+
+    char grammar_logs_dir[PATH_MAX];
+    snprintf(grammar_logs_dir, sizeof(grammar_logs_dir), "%s/%s", parser_logs_dir, "grammar_logs.txt");
+    FILE* file_grammar = fopen(grammar_logs_dir, "w");
     export_grammar(G, value_map, file_grammar);
     fclose(file_grammar);
 
     //return 0;
 
     if(generate_parsing_tables){
-        printf("Tables Generated!\n");
-        TableMapping garbage = tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map);
+        printf("--- Action and Goto Tables ---\n");
+        TableMapping garbage = tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map, "parser/tables/goto_action.txt", parser_logs_dir, true);
         destroy_tables(garbage);
+        printf("--- Finished ---\n");
     }
     
+    printf("Loading action and goto tables...\n");
     //TableMapping tables_info = tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map);
-    TableMapping tables_info = load_parsing_tables("tables/text_tables.txt");
+    TableMapping tables_info = load_parsing_tables("parser/tables/goto_action.txt");
 
     //assert_table_mappings_equal(&tables_info, &tables_info2);
     //save_parsing_tables(&tables_info, "tables/loaded_text_tables.txt");
-
-    printf("Tables Loaded!\n");
 
     // --- 6. LEXER EXECUTION ---
     char* file_dir = "languaje.k";
@@ -1591,26 +1642,31 @@ int main(){
 
     //FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
     if(generate_lexing_tables){
-        printf("--- Generating language lexer ---\n");
-        TableDFA tmp2 = make_tables(lexing_rules, "lexer/tables/language_transitions.sc", "lexer/logs/language/regex_logs.txt", "lexer/logs/language/split_logs.txt", "lexer/logs/language/nfa_logs.txt", "lexer/logs/language/dfa_logs.txt", "lexer/logs/language/table_logs.txt", true);
+        printf("--- Language Lexer ---\n");
+        TableDFA tmp2 = make_tables(lexing_rules, "lexer/tables/language_transitions.sc", language_logs_dir, true);
         destroyDFATable(tmp2);
+        printf("--- Finished ---\n");
     }
+
+    printf("Loading language lexer...\n");
     
     TableDFA lexing_rules_table = loadDFATable("lexer/tables/language_transitions.sc");
 
     // THIS NEEDS TO BE FREED AFTER USE WITH LEXER AND STRINGS WITHIN
-    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, "lexer/logs/language/muncher.txt", "lexer/logs/language/token_list.txt");
+
+    printf("Lexing language character stream...");
+    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, language_logs_dir);
 
     destroyDFATable(lexing_rules_table);
 
-    return 0;
-
-    print_token_seq(scanner_out);
-    FILE* file_lexer_seq = fopen("output/lexer_seq.txt", "w");
-    export_token_seq(scanner_out, file_lexer_seq);
-    fclose(file_lexer_seq);
+    //print_token_seq(scanner_out);
+    //FILE* file_lexer_seq = fopen("output/lexer_seq.txt", "w");
+    //export_token_seq(scanner_out, file_lexer_seq);
+    //fclose(file_lexer_seq);
 
     // --- 7. PARSER EXECUTION ---
+
+    printf("Parsing token sequence...");
     ParserOutput par_out = parser_skeleton(G, tables_info, scanner_out, value_map);
 
     dynarray_destroy(scanner_out);
@@ -1618,11 +1674,25 @@ int main(){
     free(value_map);
     dynadict_destroy(dict_map);
 
+    printf("Saving parsing logs...");
+
     // THERE IS NO CST DESTRUCTION YET
     if (par_out.CST) {
+        char cst_dir[PATH_MAX];
+        snprintf(cst_dir, sizeof(cst_dir), "%s/%s", parser_logs_dir, "cst_logs.txt");
+        FILE* cst_file_ptr = fopen(cst_dir, "w");
+        export_tree(cst_file_ptr, par_out.CST, "", true, true);
+        fclose(cst_file_ptr);
+
         printf("\n--- Parse Tree ---\n");
         print_tree(par_out.CST, "", true, true);
     }
+
+    char ast_dir[PATH_MAX];
+    snprintf(ast_dir, sizeof(ast_dir), "%s/%s", parser_logs_dir, "ast_logs.txt");
+    FILE* ast_file_ptr = fopen(ast_dir, "w");
+    export_ast(ast_file_ptr, par_out.AST.root, "", true);
+    fclose(ast_file_ptr);
 
     printf("\n--- AST ---\n");
     print_ast(par_out.AST.root, "", true);

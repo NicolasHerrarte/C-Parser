@@ -1,2 +1,4 @@
-init int[][] arr <- assign int[3][3];
-arr[0][1] = 5;
+init int[][] matrix <- assign int[3][3];
+matrix[0][0] = 1;
+matrix[1][1] = 2;
+matrix[2][2] = 3;
