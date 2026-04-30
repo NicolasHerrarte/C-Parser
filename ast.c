@@ -91,7 +91,7 @@ ASTNode create_box(Arena* arena, enum BoxMode boxtype, ASTNode child){
             // removing the " "
             box_storage->wrapper = STRING_WRAPPER;
 
-            int char_len =  strlen(child.storage.label);
+            int char_len = strlen(child.storage.label);
             int new_len = char_len - 2;
             char* str_copy = (char*) arena_get(arena, sizeof(char) * (new_len+1));
             strncpy(str_copy, child.storage.label+1, new_len);
@@ -142,14 +142,14 @@ void destroyAST(TreeManager tm){
     arena_destroy(tm.arena);
 }
 
-void export_ast(FILE* stream_out, ASTNode node, char* prefix, bool is_last) {
+void export_ast(FILE* stream_out, ASTNode node, char* prefix, bool is_last, char** ast_val_map) {
     if (prefix[0] != '\0') {
         fprintf(stream_out, "%s%s", prefix, is_last ? "└── " : "├── ");
     }
 
     if (node.tag == NODE) {
         InternalNode* internal = node.storage.node;
-        fprintf(stream_out, "[NODE] Type: %d\n", internal->type);
+        fprintf(stream_out, "[NODE] Type: %s\n", ast_val_map[internal->type]);
 
         char next_prefix[512];
         if (prefix[0] == '\0') {
@@ -171,7 +171,7 @@ void export_ast(FILE* stream_out, ASTNode node, char* prefix, bool is_last) {
             // Recurse using the current node
             // Note: We pass *current because your print_ast likely expects the struct, 
             // or current if it expects a pointer.
-            export_ast(stream_out, *current, actual_prefix, last_child);
+            export_ast(stream_out, *current, actual_prefix, last_child, ast_val_map);
 
             // Move to the next sibling
             current = current->sibling;
@@ -193,8 +193,8 @@ void export_ast(FILE* stream_out, ASTNode node, char* prefix, bool is_last) {
     }
 }
 
-void print_ast(ASTNode node, char* prefix, bool is_last) {
-    export_ast(stdout, node, prefix, is_last);
+void print_ast(ASTNode node, char* prefix, bool is_last, char** ast_val_map) {
+    export_ast(stdout, node, prefix, is_last, ast_val_map);
 }
 
 
@@ -237,7 +237,7 @@ void ast_routine() {
     // ---------------------------------
 
     tm.root = root;
-    print_ast(tm.root, "", true);
+    //print_ast(tm.root, "", true);
 
     destroyAST(tm);
 }

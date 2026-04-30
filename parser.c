@@ -1571,8 +1571,15 @@ int main(){
 
     // All the dynadict and value map info for CST is stored HERE in the PAIRS!!
     // All the strings for the CST are stored in the Token Sequence!!
+    // It now creates a copy allowing for easy tree destruction
+
     // Every string in the ast value mappings is stored in the AST PAIRS!!
     // Everything in the AST is stored on its ARENA!!
+
+    // ONLY AST PAIRS ARE PENDING TO DELETE!
+
+    //AST is already deleted
+    //CST is deleted as well
 
     char* rules_logs_dir = "lexer/logs/rules";
     char* language_logs_dir = "lexer/logs/language";
@@ -1580,12 +1587,12 @@ int main(){
 
     int symbols_amount = 83;
 
+    bool generate_parsing_tables = false;
+    bool generate_lexing_tables = false;
+
     printf("Setting mappings...\n");
     Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
     char** value_map = storage_table_from_mapping(mapping, symbols_amount);
-
-    bool generate_parsing_tables = false;
-    bool generate_lexing_tables = false;
 
     // --- 2. GRAMMAR CONSTRUCTION ---
     char* prod_rules_src = "grammar.k.specs";
@@ -1654,7 +1661,7 @@ int main(){
 
     // THIS NEEDS TO BE FREED AFTER USE WITH LEXER AND STRINGS WITHIN
 
-    printf("Lexing language character stream...");
+    printf("Lexing language character stream...\n");
     Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, language_logs_dir);
 
     destroyDFATable(lexing_rules_table);
@@ -1666,15 +1673,16 @@ int main(){
 
     // --- 7. PARSER EXECUTION ---
 
-    printf("Parsing token sequence...");
+    printf("Parsing token sequence...\n");
     ParserOutput par_out = parser_skeleton(G, tables_info, scanner_out, value_map);
 
+    destroy_token_sequence(scanner_out);
     dynarray_destroy(scanner_out);
     destroy_tables(tables_info);
     free(value_map);
     dynadict_destroy(dict_map);
 
-    printf("Saving parsing logs...");
+    printf("Saving parsing logs...\n");
 
     // THERE IS NO CST DESTRUCTION YET
     if (par_out.CST) {
@@ -1684,18 +1692,30 @@ int main(){
         export_tree(cst_file_ptr, par_out.CST, "", true, true);
         fclose(cst_file_ptr);
 
-        printf("\n--- Parse Tree ---\n");
-        print_tree(par_out.CST, "", true, true);
+        //printf("\n--- Parse Tree ---\n");
+        //print_tree(par_out.CST, "", true, true);
     }
 
     char ast_dir[PATH_MAX];
     snprintf(ast_dir, sizeof(ast_dir), "%s/%s", parser_logs_dir, "ast_logs.txt");
     FILE* ast_file_ptr = fopen(ast_dir, "w");
-    export_ast(ast_file_ptr, par_out.AST.root, "", true);
+    export_ast(ast_file_ptr, par_out.AST.root, "", true, ast_val_map);
     fclose(ast_file_ptr);
 
-    printf("\n--- AST ---\n");
-    print_ast(par_out.AST.root, "", true);
+    //printf("\n--- AST ---\n");
+    //print_ast(par_out.AST.root, "", true);
+
+    printf("Freeing tree memory...\n");
+
+    free(ast_val_map);
+    for(int i = 0;i<dynarray_length(ast_mapping);i++){
+        free(ast_mapping[i].key);
+    }
+    dynarray_destroy(ast_mapping);
+    destroy_tree(par_out.CST);
+    destroyAST(par_out.AST);
+
+    printf("Parsing Finished!\n");
 
     // NEED TO SERIOUSLY FIND A BETTER WAY TO DISPLAY LOGS OMFG
     return 0;

@@ -23,12 +23,15 @@ TreeNode* tree_make_node(int amount_nodes, char* name, TreeNode** nodes){
 
 void tree_destroy_node(TreeNode* node){
     free(node->children);
-    free(node);
     free(node->name);
+    free(node);
 }
 
 void destroy_tree(TreeNode* node){
-
+    for (int i = 0; i < node->children_amount; i++) {
+        destroy_tree(node->children[i]);
+    }
+    tree_destroy_node(node);
 }
 
 void export_node_info(FILE* stream_out, TreeNode* node) {

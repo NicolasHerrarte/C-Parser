@@ -66,7 +66,8 @@ ASTNode create_label(Arena* arena, char* token_char, int char_length);
 ASTNode create_box(Arena* arena, enum BoxMode boxtype, ASTNode child);
 ASTNode create_value_box(Arena* arena, int value);
 TreeManager initializeAST();
+
 void destroyAST(TreeManager tm);
 
-void print_ast(ASTNode node, char* prefix, bool is_last);
-void export_ast(FILE* stream_out, ASTNode node, char* prefix, bool is_last);
+void print_ast(ASTNode node, char* prefix, bool is_last, char** ast_val_map);
+void export_ast(FILE* stream_out, ASTNode node, char* prefix, bool is_last, char** ast_val_map);
