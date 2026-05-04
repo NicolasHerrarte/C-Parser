@@ -104,7 +104,7 @@ Access          /-> Access [ Expr ]                             /%%/ @mn -$0 -$2
 /|              /-> Access . Identifier                         /%%/ @mn -$0 -$2 <PropertyAccess> /;
 /|              /-> AccessBase                                  /%%/ @sh -$0 /;
 
-AccessBase      /-> Identifier                                  /%%/ @sh -$0 /;
+AccessBase      /-> Identifier                                  /%%/ @mn -$0 <Access> /;
 /|              /-> ( Expr )                                    /%%/ @sh -$1 /;
 
 Identifier      /-> name                                        /%%/ @bx [5] /;
