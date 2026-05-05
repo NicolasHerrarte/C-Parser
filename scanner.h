@@ -2,6 +2,7 @@
 #include <string.h> 
 #include <stdio.h>
 
+#include "re_pp.h"
 #include "subset.h"
 
 #define ALT_PRIORITY 0

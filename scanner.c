@@ -7,7 +7,6 @@
 #include <limits.h>
 
 #include "dynarray.h"
-#include "re_pp.h"
 #include "subset.h"
 #include "scanner.h"
 

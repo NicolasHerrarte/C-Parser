@@ -8,26 +8,27 @@
 #include "hash.h"
 
 
-Hash _hash_create(int node_amount, size_t stride, size_t key_stride, void* ptr_func, bool uses_key_storage)
+Hash *_hash_create(int node_amount, size_t stride, size_t key_stride, void* ptr_func, bool uses_key_storage)
 {
-    Hash hash;
-    hash.table = calloc(node_amount, sizeof(Node*));
-    hash.obj_storage = _dynarray_create(DYNARRAY_DEFAULT_CAP, stride);
+    Hash* hash = malloc(sizeof(Hash));
+    hash->table = calloc(node_amount, sizeof(Node*));
+    hash->obj_storage = _dynarray_create(DYNARRAY_DEFAULT_CAP, stride);
     if(uses_key_storage){
-        hash.key_storage = _dynarray_create(DYNARRAY_DEFAULT_CAP, key_stride);
+        hash->key_storage = _dynarray_create(DYNARRAY_DEFAULT_CAP, key_stride);
     }
-    hash.stride = stride;
-    hash.key_stride = key_stride;
-    hash.f_ptr = ptr_func;
-    hash.capacity = node_amount;
-    hash.holes = dynarray_create(int);
-    hash.count = 0;
+    hash->stride = stride;
+    hash->key_stride = key_stride;
+    hash->f_ptr = ptr_func;
+    hash->capacity = node_amount;
+    hash->holes = dynarray_create(int);
+    hash->count = 0;
+    hash->uses_keys = uses_key_storage;
 
     return hash;
 }
 
 
-bool _hash_in(Hash *hash, void *xptr, void *str_ptr, bool (*f_equality_ptr)(void*, void*), int action, bool uses_key_storage){
+bool _hash_in(Hash *hash, void *xptr, void *str_ptr, bool (*f_equality_ptr)(void*, void*), int action){
     uint64_t hash_id = hash->f_ptr(xptr);
 
     int bucket_id = hash_id%(hash->capacity);
@@ -40,7 +41,7 @@ bool _hash_in(Hash *hash, void *xptr, void *str_ptr, bool (*f_equality_ptr)(void
         while(tmp != NULL){
             uint64_t curr_hash_id = tmp->hash_index;
             bool bucket_pass;
-            if(uses_key_storage){
+            if(hash->uses_keys){
                 bucket_pass = f_equality_ptr(xptr, (char*) hash->key_storage + tmp->storage_index * hash->key_stride);
             }
             else{
@@ -75,13 +76,13 @@ bool _hash_in(Hash *hash, void *xptr, void *str_ptr, bool (*f_equality_ptr)(void
         if(dynarray_length(hash->holes)>0){
             dynarray_pop(hash->holes, &placement_index);
             _dynarray_replace(hash->obj_storage, str_ptr, placement_index);
-            if(uses_key_storage){
+            if(hash->uses_keys){
                 _dynarray_replace(hash->key_storage, xptr, placement_index);
             }
         }
         else{
             hash->obj_storage = _dynarray_push(hash->obj_storage, str_ptr);
-            if(uses_key_storage){
+            if(hash->uses_keys){
                 hash->key_storage = _dynarray_push(hash->key_storage, xptr);
             }
         }
@@ -101,7 +102,7 @@ bool _hash_in(Hash *hash, void *xptr, void *str_ptr, bool (*f_equality_ptr)(void
     return false;
 }
 
-void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), bool uses_key_storage){
+void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*)){
     uint64_t hash_id = hash->f_ptr(xptr);
 
     int bucket_id = hash_id%(hash->capacity);
@@ -115,7 +116,7 @@ void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), bo
             uint64_t curr_hash_id = tmp->hash_index;
 
             bool bucket_pass;
-            if(uses_key_storage){
+            if(hash->uses_keys){
                 bucket_pass = f_equality_ptr(xptr, (char*) hash->key_storage + tmp->storage_index * hash->key_stride);
             }
             else{
@@ -132,7 +133,7 @@ void *_hash_get(Hash *hash, void *xptr, bool (*f_equality_ptr)(void*, void*), bo
     return NULL;
 }
 
-void _hash_destroy(Hash *hash, bool uses_key_storage){
+void _hash_destroy(Hash *hash){
     for(int i=0;i<hash->capacity;i++){
         Node* slot = hash->table[i];
         if(slot != NULL){
@@ -148,10 +149,11 @@ void _hash_destroy(Hash *hash, bool uses_key_storage){
     }
     free(hash->table);
     dynarray_destroy(hash->obj_storage);
-    if(uses_key_storage){
+    if(hash->uses_keys){
         dynarray_destroy(hash->key_storage);
     }
     dynarray_destroy(hash->holes);
+    free(hash);
 }
 
 void *_hash_to_list(Hash *hash){
@@ -163,6 +165,22 @@ void *_hash_to_list(Hash *hash){
 
             while(tmp != NULL){
                 arr = _dynarray_push(arr, (char*) hash->obj_storage + tmp->storage_index * hash->stride);
+                tmp = tmp->next;
+            }
+        }
+    }
+    return arr;
+}
+
+void *_hash_list_indexes(Hash *hash){
+    void* arr = _dynarray_create(hash->count, hash->key_stride);
+    for(int i=0;i<hash->capacity;i++){
+        if(hash->table[i] != NULL){
+
+            Node* tmp = hash->table[i];
+
+            while(tmp != NULL){
+                arr = _dynarray_push(arr, (char*) hash->key_storage + tmp->storage_index * hash->key_stride);
                 tmp = tmp->next;
             }
         }

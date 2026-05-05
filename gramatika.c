@@ -226,13 +226,12 @@ bool buildup_lists_are_equal(BuildUp* list1, BuildUp* list2) {
     return true;
 }
 
-Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_mapping, int symbols_amount, Pair** pair_ptr, char *** value_src, char* rules_logs_dir, bool debug){
-    int ignore_categories[] = {1};
+Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, int* ignore_categories_grammar, Hash* dict_mapping, int symbols_amount, Pair** pair_ptr, char *** value_src, char* rules_logs_dir, bool debug){
 
     if(debug){
         printf("Lexing rules character stream...\n");
     }
-    Token* token_anchor = file_scan(rules_regex, file_lexing_rules, BUFFER_SIZE_GRAMMAR, ignore_categories, 1, rules_logs_dir);
+    Token* token_anchor = file_scan(rules_regex, file_lexing_rules, BUFFER_SIZE_GRAMMAR, ignore_categories_grammar, 1, rules_logs_dir);
     // THIS SEQUENCE NEEDS TO BE DESTROYED AFTER THE PAIRS ARE NO LONGER NEEDED
 
     if(debug){
@@ -252,7 +251,7 @@ Grammar build_grammar(TableDFA rules_regex, char *file_lexing_rules, Hash dict_m
     int* beta_memory = dynarray_create(int);
     bool first_creation = true;
 
-    Hash ast_map = dynadict_create(512, int);
+    Hash* ast_map = dynadict_create(512, int);
     Pair* ast_pairs = dynarray_create(Pair);
     int pairs_count = 0;
     int token_count = 1;

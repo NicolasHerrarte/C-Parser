@@ -8,80 +8,7 @@
 #include "dynarray.h"
 #include "subset.h"
 #include "hash.h"
-#include "scanner.h"
-#include "re_pp.h"
-#include "tree.h"
-#include "gramatika.h"
-#include "ast.h"
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
-
-#define DEFAULT_STACK_SIZE 4
-#define BUFFER_SIZE 500
-
-enum {
-    END,
-    EPSILON_P,
-    GOAL,
-};
-
-enum {
-    TREENODE_POS,
-    AST_POS,
-    TOKEN_POS,
-    STATE_POS,
-};
-
-typedef struct ParserOutput{
-    TreeNode* CST;
-    TreeManager AST;
-} ParserOutput;
-
-typedef struct Item{
-    int alpha;
-    int** beta;
-    int lookahead;
-    int k;
-} Item;
-
-typedef struct CC_Item{
-    Item* cc;
-    int state;
-    bool marked;
-} CC_Item;
-
-// From Scanner
-typedef struct LRTransition{
-    int state_from;
-    int state_to;
-    int trans_symbol;
-} LRTransition;
-
-typedef union StackItem{
-    Token token;
-    ASTNode ast_node;
-    void* s_ptr;
-    int s_int;
-} StackItem;
-
-typedef struct TableMaterial{
-    CC_Item* CC;
-    LRTransition* goto_transitions;
-} TableMaterial;
-
-typedef struct TableMapping{
-    int*** table_action;;
-    int** table_goto;
-    int states_count; 
-    int t_count;
-    int nt_count ;
-    int* action_mapping;
-    int* goto_mapping;
-    int* symbols_mapping;
-} TableMapping;
-
+#include "parser.h"
 
 void print_transition_single(LRTransition t, char** symbol_names) {
     printf("  State %d --( %s )--> State %d\n", 
@@ -298,6 +225,15 @@ void export_item(Item item, char** index_mapping, int max_alpha, int max_rhs, FI
     if (padding > 0) fprintf(out, "%*s", padding, "");
 
     fprintf(out, ", %s ]\n", index_mapping[item.lookahead]);
+}
+
+void export_handle(Production prod, char** index_mapping, FILE* out) {
+    fprintf(out, "%s", index_mapping[prod.alpha]);
+
+    int len = dynarray_length(prod.beta);
+    for(int i = 0;i<dynarray_length(prod.beta);i++){
+        fprintf(out, "%s ", index_mapping[prod.beta[i]]);
+    }
 }
 
 void print_item(Item item, char** index_mapping, int max_alpha, int max_rhs) {
@@ -577,7 +513,7 @@ TableMaterial c_collection(Grammar G, Subset* first){
 
     CC_Item* CC = dynarray_create(CC_Item);
     LRTransition* trans = dynarray_create(LRTransition);
-    Hash HCC = hash_create(2048, CC_Item, hash_CC_item);
+    Hash* HCC = hash_create(2048, CC_Item, hash_CC_item);
     dynarray_push(CC, cc0);
     hash_add(HCC, cc0, hash_CC_item_equal);
 
@@ -636,20 +572,6 @@ TableMaterial c_collection(Grammar G, Subset* first){
             }
         }
     }
-
-    //printf("OK OK OK?\n");
-    //for(int i = 0;i<dynarray_length(CC);i++){
-        //printf("---\n");
-        //for(int j = 0;j<dynarray_length(CC[i].cc);j++){
-            //print_item(CC[i].cc[j]);
-        //}
-        //printf("---\n");
-    //}
-
-    //for(int i = 0;i<dynarray_length(trans);i++){
-        //printf("---\n");
-        //print_transition(trans[i]);
-    //}
 
     hash_destroy(HCC);
 
@@ -1140,40 +1062,39 @@ void destroy_tables(TableMapping t_mapping){
     dynarray_destroy(t_mapping.goto_mapping);
 }
 
-void print_stack(StackItem* stack, char** index_mapping) {
+void export_stack(StackItem* stack, char** index_mapping, FILE* out) {
     int len = dynarray_length(stack);
-    printf("--- Stack ---\n");
-    printf("[ ");
+    fprintf(out, "[ ");
     
     for (int i = 0; i < len; i++) {
         if(i % DEFAULT_STACK_SIZE == 0){
-            printf("| ");
+            fprintf(out, "| ");
         }
         if (i % DEFAULT_STACK_SIZE == TOKEN_POS) {
-            printf("%s ", index_mapping[stack[i].token.category]);
+            fprintf(out, "%s ", index_mapping[stack[i].token.category]);
         }
         else if (i % DEFAULT_STACK_SIZE == STATE_POS){
-            printf("%d ", stack[i].s_int);
+            fprintf(out, "%d ", stack[i].s_int);
         }
         else if (i % DEFAULT_STACK_SIZE == TREENODE_POS){
-            printf("", ((TreeNode*) (stack[i].s_ptr))->children_amount);
+            fprintf(out, "", ((TreeNode*) (stack[i].s_ptr))->children_amount);
         }
         else if (i % DEFAULT_STACK_SIZE == AST_POS){
-            printf("%d ", (stack[i].ast_node.tag));
+            fprintf(out, "%d ", (stack[i].ast_node.tag));
             switch (stack[i].ast_node.tag) {
                 case NODE:
-                    printf("NODE(%d) ", stack[i].ast_node.storage.node->type);
+                    fprintf(out, "NODE(%d) ", stack[i].ast_node.storage.node->type);
                     break;
                 case BOX:
                     Box* b = stack[i].ast_node.storage.box;
-                    if (b->wrapper == ID_WRAPPER) printf("ID(%s) ", b->value.bstring);
-                    else if (b->wrapper == INT_WRAPPER) printf("INT(%d) ", b->value.bint);
-                    else if (b->wrapper == BOOL_WRAPPER) printf("BOOL(%d) ", b->value.bint);
-                    else if (b->wrapper == FLOAT_WRAPPER) printf("FLOAT(%.2f) ", b->value.bfloat);
-                    else if (b->wrapper == STRING_WRAPPER) printf("STR(%s) ", b->value.bstring);
+                    if (b->wrapper == ID_WRAPPER) fprintf(out, "ID(%s) ", b->value.bstring);
+                    else if (b->wrapper == INT_WRAPPER) fprintf(out, "INT(%d) ", b->value.bint);
+                    else if (b->wrapper == BOOL_WRAPPER) fprintf(out, "BOOL(%d) ", b->value.bint);
+                    else if (b->wrapper == FLOAT_WRAPPER) fprintf(out, "FLOAT(%.2f) ", b->value.bfloat);
+                    else if (b->wrapper == STRING_WRAPPER) fprintf(out, "STR(%s) ", b->value.bstring);
                     break;
                 case LABEL:
-                    printf("LABEL(%s) ", (stack[i].ast_node.storage.label));
+                    fprintf(out, "LABEL(%s) ", (stack[i].ast_node.storage.label));
                     break; 
                 default:
                     assert(false);
@@ -1181,13 +1102,17 @@ void print_stack(StackItem* stack, char** index_mapping) {
         }
     }
 
-    printf("|");
+    fprintf(out, "|");
     
-    printf("]\n");
+    fprintf(out, "]\n");
 }
 
-Hash dictionary_from_mapping(Pair* mapping, int map_size){
-    Hash dict_map = dynadict_create(512, int);
+void print_stack(StackItem* stack, char** index_mapping) {
+    export_stack(stack, index_mapping, stdout);
+}
+
+Hash* dictionary_from_mapping(Pair* mapping, int map_size){
+    Hash* dict_map = dynadict_create(512, int);
     for(int i=0;i<map_size;i++){
         //printf("DICT MAPPING: %d %s %d\n", i, mapping[i].key, mapping[i].value);
         char* key = mapping[i].key;
@@ -1202,8 +1127,7 @@ int get_stack_position(int stack_len, int element, int offset){
     return stack_len-((element+1)*(DEFAULT_STACK_SIZE))+offset;
 }
 
-ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** index_mapping){
-
+ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char** index_mapping, FILE* skeleton_out){
     TreeManager tm = initializeAST();
     StackItem* stack = dynarray_create(StackItem);
 
@@ -1226,16 +1150,21 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
 
     //printf("STACK: %d\n", first_state.s_int);
 
+    int iteration = 0;
+
     do{
         StackItem top_state = dynarray_get_last(stack);
 
-        //printf("--- Iteration ---\n");
+        //fprintf(skeleton_out, "--- Iteration ---\n");
         //printf("Current Word: %s\n", index_mapping[token_ptr->category]);
         //printf("Current Cat: %d\n", token_ptr->category);
         //printf("Current State: %d\n", top_state.s_int);
-        //print_stack(stack, index_mapping);
+        //export_stack(stack, index_mapping, skeleton_out);
 
         int word_category_table = tb.symbols_mapping[token_ptr->category];
+
+        fprintf(skeleton_out, "Iteration: %d, State: %d Word: %s\n", iteration, top_state.s_int, token_ptr->word);
+        export_stack(stack, index_mapping, skeleton_out);
 
         //printf("KILL ME -> %d\n", top_state.s_int);
         //printf("KILL ME -> %d\n", word_category_table);
@@ -1357,9 +1286,11 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
             dynarray_push(stack, new_ast_node);
             dynarray_push(stack, new_token);
             dynarray_push(stack, new_state);
-           
             
-            //printf("Reduce -> %d\n", prod_rule+1); 
+            fprintf(skeleton_out, "Handle: "); 
+            export_handle(G.productions[prod_rule], index_mapping, skeleton_out);
+            fprintf(skeleton_out, "\n"); 
+            fprintf(skeleton_out, "Reduce -> %d\n", prod_rule+1); 
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 2){
             int to_state = tb.table_action[top_state.s_int][word_category_table][1];
@@ -1389,17 +1320,19 @@ ParserOutput parser_skeleton(Grammar G, TableMapping tb, Token* token_ptr, char*
 
             token_ptr++;
 
-            //printf("Shift -> %d\n", to_state);
+            fprintf(skeleton_out, "Shift -> %d\n", to_state);
         }
         else if(tb.table_action[top_state.s_int][word_category_table][0] == 1){
-            printf("Accept\n");
+            fprintf(skeleton_out, "Accept\n");
             break;
         }
         else{
             printf("Error\n");
+            assert(false);
             break;
         }
 
+        iteration ++;
         //printf("%s", token_ptr->word);
     } while(true);
 
@@ -1421,7 +1354,7 @@ bool int_equal(void* a, void* b) {
 }
 
 
-TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_rules_src, char* re_rules, char** value_map, char* save_table_dir, char* parser_logs_dir, bool debug) {
+TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char* prod_rules_src, char** value_map, char* save_table_dir, char* parser_logs_dir, bool debug) {
     
     if(debug){
         printf("Generating first sets...\n");
@@ -1429,8 +1362,8 @@ TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char*
     Subset* first = generate_first(G);
     
     char first_logs_dir[PATH_MAX];
-    snprintf(first_logs_dir, sizeof(first_logs_dir), "%s/%s", parser_logs_dir, "first_set_logs.txt");
-    FILE* file_first = fopen("output/first_sets.txt", "w");
+    snprintf(first_logs_dir, sizeof(first_logs_dir), "%s/%s", parser_logs_dir, "first_set_log.txt");
+    FILE* file_first = fopen(first_logs_dir, "w");
 
     assert(file_first);
     export_first_sets(G, first, value_map, file_first);
@@ -1444,7 +1377,7 @@ TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char*
     destroy_first(G, first);
 
     char collection_states_logs_dir[PATH_MAX];
-    snprintf(collection_states_logs_dir, sizeof(collection_states_logs_dir), "%s/%s", parser_logs_dir, "collection_states_logs.txt");
+    snprintf(collection_states_logs_dir, sizeof(collection_states_logs_dir), "%s/%s", parser_logs_dir, "collection_states_log.txt");
     FILE* file_collection_states = fopen(collection_states_logs_dir, "w");
 
     assert(file_collection_states);
@@ -1452,7 +1385,7 @@ TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char*
     fclose(file_collection_states);
 
     char collection_trans_logs_dir[PATH_MAX];
-    snprintf(collection_trans_logs_dir, sizeof(collection_trans_logs_dir), "%s/%s", parser_logs_dir, "collection_transitions_logs.txt");
+    snprintf(collection_trans_logs_dir, sizeof(collection_trans_logs_dir), "%s/%s", parser_logs_dir, "collection_transitions_log.txt");
     FILE* file_collection_trans = fopen(collection_trans_logs_dir, "w");
 
     assert(file_collection_trans);
@@ -1466,7 +1399,7 @@ TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char*
     TableMapping tables_info = create_tables(G, table_material);
     
     char parse_tables_logs_dir[PATH_MAX];
-    snprintf(parse_tables_logs_dir, sizeof(parse_tables_logs_dir), "%s/%s", parser_logs_dir, "action_goto_tables_logs.txt");
+    snprintf(parse_tables_logs_dir, sizeof(parse_tables_logs_dir), "%s/%s", parser_logs_dir, "action_goto_tables_log.txt");
     FILE* file_tables = fopen(parse_tables_logs_dir, "w");
     export_tables(&tables_info, file_tables);
     fclose(file_tables);
@@ -1479,10 +1412,162 @@ TableMapping tables_pipeline(Grammar G, Pair* mapping, int symbols_amount, char*
     return tables_info;
 }
 
+TreeManager parse_pipeline(char* language_src, char* language_regex, char* rules_src, char* rules_regex, int* ignore_cats_language, int* ignore_cats_rules, Pair* mapping, int symbols_amount, char* lexer_dir, char* parser_dir, bool generate_parsing_tables, bool generate_lexing_tables, bool debug){
+
+    char lexer_rules_table_dir[PATH_MAX];
+    snprintf(lexer_rules_table_dir, sizeof(lexer_rules_table_dir), "%s/tables/rules_transitions.sc", lexer_dir);
+
+    char lexer_language_table_dir[PATH_MAX];
+    snprintf(lexer_language_table_dir, sizeof(lexer_language_table_dir), "%s/tables/language_transitions.sc", lexer_dir);
+
+    char parser_goto_action_table_dir[PATH_MAX];
+    snprintf(parser_goto_action_table_dir, sizeof(parser_goto_action_table_dir), "%s/tables/goto_action.txt", parser_dir);
+
+    char rules_logs_dir[PATH_MAX];
+    snprintf(rules_logs_dir, sizeof(rules_logs_dir), "%s/logs/rules", lexer_dir);
+
+    char language_logs_dir[PATH_MAX];
+    snprintf(language_logs_dir, sizeof(language_logs_dir), "%s/logs/language", lexer_dir);
+
+    char parser_logs_dir[PATH_MAX];
+    snprintf(parser_logs_dir, sizeof(parser_logs_dir), "%s/logs", parser_dir);
+
+    if(debug){
+        printf("Setting mappings...\n");
+    }
+    Hash* dict_map = dictionary_from_mapping(mapping, symbols_amount);
+    char** value_map = storage_table_from_mapping(mapping, symbols_amount);
+
+    if(generate_lexing_tables){
+        if(debug){
+            printf("--- Rules Lexer ---\n");
+        }
+        TableDFA tmp1 = make_tables(rules_regex, lexer_rules_table_dir, rules_logs_dir, debug);
+        destroyDFATable(tmp1);
+        if(debug){
+            printf("--- Finished ---\n");
+        }
+    }
+
+    if(debug){
+        printf("Loading rules lexer...\n");
+    }
+    TableDFA table_load = loadDFATable(lexer_rules_table_dir);
+    
+    char** ast_val_map;
+    Pair* ast_mapping;
+
+    if(debug){
+        printf("--- Gramatika Creation ---\n");
+    }
+
+    Grammar G = build_grammar(table_load, rules_src, ignore_cats_rules, dict_map, symbols_amount, &ast_mapping, &ast_val_map, rules_logs_dir, debug);
+    destroyDFATable(table_load);
+
+    if(debug){
+        printf("--- Finished ---\n");
+    }
+
+    char grammar_logs_dir[PATH_MAX];
+    snprintf(grammar_logs_dir, sizeof(grammar_logs_dir), "%s/%s", parser_logs_dir, "grammar_log.txt");
+    FILE* file_grammar = fopen(grammar_logs_dir, "w");
+    export_grammar(G, value_map, file_grammar);
+    fclose(file_grammar);
+
+    if(generate_parsing_tables){
+        if(debug){
+            printf("--- Action and Goto Tables ---\n");
+        }
+        TableMapping garbage = tables_pipeline(G, mapping, symbols_amount, rules_src, value_map, parser_goto_action_table_dir, parser_logs_dir, debug);
+        destroy_tables(garbage);
+        if(debug){
+            printf("--- Finished ---\n");
+        }
+    }
+
+    if(debug){
+        printf("Loading action and goto tables...\n");
+    }
+    TableMapping tables_info = load_parsing_tables(parser_goto_action_table_dir);
+
+    if(generate_lexing_tables){
+        if(debug){
+            printf("--- Language Lexer ---\n");
+        }
+        TableDFA tmp2 = make_tables(language_regex, lexer_language_table_dir, language_logs_dir, debug);
+        destroyDFATable(tmp2);
+        if(debug){
+            printf("--- Finished ---\n");
+        }
+    }
+
+    if(debug){
+        printf("Loading language lexer...\n");
+    }
+
+    TableDFA lexing_rules_table = loadDFATable(lexer_language_table_dir);
+
+    if(debug){
+        printf("Lexing language character stream...\n");
+    }
+    Token* scanner_out = file_scan(lexing_rules_table, language_src, BUFFER_SIZE, ignore_cats_language, 1, language_logs_dir);
+
+    destroyDFATable(lexing_rules_table);
+
+    if(debug){
+        printf("Parsing token sequence...\n");
+    }
+
+    
+    char parser_log_skeleton_dir[PATH_MAX];
+    snprintf(parser_log_skeleton_dir, sizeof(parser_log_skeleton_dir), "%s/skeleton_log.txt", parser_logs_dir);
+    FILE* parser_skeleton_log = fopen(parser_log_skeleton_dir, "w");
+    ParserOutput par_out = parser_skeleton(G, tables_info, scanner_out, value_map, parser_skeleton_log);
+    fclose(parser_skeleton_log);
+
+    destroy_token_sequence(scanner_out);
+    dynarray_destroy(scanner_out);
+    destroy_tables(tables_info);
+    free(value_map);
+    dynadict_destroy(dict_map);
+
+    if(debug){
+        printf("Saving parsing logs...\n");
+    }
+
+    if (par_out.CST) {
+        char cst_dir[PATH_MAX];
+        snprintf(cst_dir, sizeof(cst_dir), "%s/%s", parser_logs_dir, "cst_log.txt");
+        FILE* cst_file_ptr = fopen(cst_dir, "w");
+        export_tree(cst_file_ptr, par_out.CST, "", true, true);
+        fclose(cst_file_ptr);
+    }
+
+    char ast_dir[PATH_MAX];
+    snprintf(ast_dir, sizeof(ast_dir), "%s/%s", parser_logs_dir, "ast_log.txt");
+    FILE* ast_file_ptr = fopen(ast_dir, "w");
+    export_ast(ast_file_ptr, par_out.AST.root, "", true, ast_val_map);
+    fclose(ast_file_ptr);
+
+    if(debug){
+        printf("Freeing tree memory...\n");
+    }
+
+    free(ast_val_map);
+    for(int i = 0;i<dynarray_length(ast_mapping);i++){
+        free(ast_mapping[i].key);
+    }
+    dynarray_destroy(ast_mapping);
+    destroy_tree(par_out.CST);
+
+    if(debug){
+        printf("Parsing Finished!\n");
+    }
+
+    return par_out.AST;
+}
 
 int main(){
-    printf("Initializing Parser...\n");
-
     Pair mapping[] = {
         {"End",             0},
         {"Epsilon",         1},
@@ -1569,154 +1654,36 @@ int main(){
         {"LogAnd",          82},
     };
 
-    // All the dynadict and value map info for CST is stored HERE in the PAIRS!!
-    // All the strings for the CST are stored in the Token Sequence!!
-    // It now creates a copy allowing for easy tree destruction
-
-    // Every string in the ast value mappings is stored in the AST PAIRS!!
-    // Everything in the AST is stored on its ARENA!!
-
-    // ONLY AST PAIRS ARE PENDING TO DELETE!
-
-    //AST is already deleted
-    //CST is deleted as well
-
-    char* rules_logs_dir = "lexer/logs/rules";
-    char* language_logs_dir = "lexer/logs/language";
-    char* parser_logs_dir = "parser/logs";
-
     int symbols_amount = 83;
 
-    bool generate_parsing_tables = false;
+    char* language_src = "language.k";
+    char* language_regex = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|(/|/|)$25|(&&)$26|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$27|(true)$28|(false)$29|(if)$35|(else)$36|(while)$37|(for)$38|(init)$39|(proc)$40|(return)$41|({)$42|(})$43|(;)$44|(<-)$45|(=)$46|(:)$47|(->)$48|(int)$49|(bool)$50|(float)$51|(string)$52|(void)$53|(break)$54|(continue)$55|(assign)$56|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+
+    char* rules_src = "grammar.k.specs";
+    char* rules_regex = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])*)$02|///|$03|(//->)$04|//;$05|(//%%//)$06|(@sh)$07|(@ap)$08|(@mn)$09|(@bx)$10|(@vl)$11|(-/$(0|[1-9][0-9]*))$12|(-#)$13|((<([a-zA-Z_])([a-zA-Z_])*)>)$14|(/[(0|[1-9][0-9]*)/])$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
+
+    int ignore_categories_language[] = {1};
+    int ignore_categories_rules[] = {1};
+
+    char* lexer_dir = "lexer";
+    char* parser_dir = "parser";
+
+    bool generate_parsing_tables = true;
     bool generate_lexing_tables = false;
 
-    printf("Setting mappings...\n");
-    Hash dict_map = dictionary_from_mapping(mapping, symbols_amount);
-    char** value_map = storage_table_from_mapping(mapping, symbols_amount);
+    bool debug = true;
 
-    // --- 2. GRAMMAR CONSTRUCTION ---
-    char* prod_rules_src = "grammar.k.specs";
-    char* re_rules = "(([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])([a-zA-Z/(/)/*///-/[/]+=?><.;{},:/|&])*)$02|///|$03|(//->)$04|//;$05|(//%%//)$06|(@sh)$07|(@ap)$08|(@mn)$09|(@bx)$10|(@vl)$11|(-/$(0|[1-9][0-9]*))$12|(-#)$13|((<([a-zA-Z_])([a-zA-Z_])*)>)$14|(/[(0|[1-9][0-9]*)/])$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
-
-    if(generate_lexing_tables){
-        printf("--- Rules Lexer ---\n");
-        TableDFA tmp1 = make_tables(re_rules, "lexer/tables/rules_transitions.sc", rules_logs_dir, true);
-        destroyDFATable(tmp1);
-        printf("--- Finished ---\n");
-    }
-    printf("Loading rules lexer...\n");
-    TableDFA table_load = loadDFATable("lexer/tables/rules_transitions.sc");
-    
-    char** ast_val_map;
-    Pair* ast_mapping;
-
-    printf("--- Gramatika Creation ---\n");
-
-    Grammar G = build_grammar(table_load, prod_rules_src, dict_map, symbols_amount, &ast_mapping, &ast_val_map, rules_logs_dir, true);
-    destroyDFATable(table_load);
-
-    printf("--- Finished ---\n");
-
-    // Export Grammar
-    //print_grammar(G, value_map);
-
-    char grammar_logs_dir[PATH_MAX];
-    snprintf(grammar_logs_dir, sizeof(grammar_logs_dir), "%s/%s", parser_logs_dir, "grammar_logs.txt");
-    FILE* file_grammar = fopen(grammar_logs_dir, "w");
-    export_grammar(G, value_map, file_grammar);
-    fclose(file_grammar);
-
-    //return 0;
-
-    if(generate_parsing_tables){
-        printf("--- Action and Goto Tables ---\n");
-        TableMapping garbage = tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map, "parser/tables/goto_action.txt", parser_logs_dir, true);
-        destroy_tables(garbage);
-        printf("--- Finished ---\n");
-    }
-    
-    printf("Loading action and goto tables...\n");
-    //TableMapping tables_info = tables_pipeline(G, mapping, symbols_amount, prod_rules_src, re_rules, value_map);
-    TableMapping tables_info = load_parsing_tables("parser/tables/goto_action.txt");
-
-    //assert_table_mappings_equal(&tables_info, &tables_info2);
-    //save_parsing_tables(&tables_info, "tables/loaded_text_tables.txt");
-
-    // --- 6. LEXER EXECUTION ---
-    char* file_dir = "languaje.k";
-    char* lexing_rules = "(=?)$20|(>=)$21|(<=)$22|(>)$23|(<)$24|(/|/|)$25|(&&)$26|+$07|-$08|/*$09|//$10|/($11|/)$12|/[$16|/]$17|.$18|,$19|(0|[1-9][0-9]*)$13|((0|[1-9][0-9]*).[0-9][0-9]*)f$14|(\"([a-zA-Z0-9_][a-zA-Z0-9_]*)\")$27|(true)$28|(false)$29|(if)$35|(else)$36|(while)$37|(for)$38|(init)$39|(proc)$40|(return)$41|({)$42|(})$43|(;)$44|(<-)$45|(=)$46|(:)$47|(->)$48|(int)$49|(bool)$50|(float)$51|(string)$52|(void)$53|(break)$54|(continue)$55|(assign)$56|([a-zA-Z_][a-zA-Z0-9_]*)$15|(( |\n|\t|\r)( |\n|\t|\r)*)$01";
-    int ignore_categories[] = {1};
-
-    //FA lexing_rules_regex = MakeFA(lexing_rules, "output/lexer_dfa.txt", true);
-    if(generate_lexing_tables){
-        printf("--- Language Lexer ---\n");
-        TableDFA tmp2 = make_tables(lexing_rules, "lexer/tables/language_transitions.sc", language_logs_dir, true);
-        destroyDFATable(tmp2);
-        printf("--- Finished ---\n");
-    }
-
-    printf("Loading language lexer...\n");
-    
-    TableDFA lexing_rules_table = loadDFATable("lexer/tables/language_transitions.sc");
-
-    // THIS NEEDS TO BE FREED AFTER USE WITH LEXER AND STRINGS WITHIN
-
-    printf("Lexing language character stream...\n");
-    Token* scanner_out = file_scan(lexing_rules_table, file_dir, BUFFER_SIZE, ignore_categories, 1, language_logs_dir);
-
-    destroyDFATable(lexing_rules_table);
-
-    //print_token_seq(scanner_out);
-    //FILE* file_lexer_seq = fopen("output/lexer_seq.txt", "w");
-    //export_token_seq(scanner_out, file_lexer_seq);
-    //fclose(file_lexer_seq);
-
-    // --- 7. PARSER EXECUTION ---
-
-    printf("Parsing token sequence...\n");
-    ParserOutput par_out = parser_skeleton(G, tables_info, scanner_out, value_map);
-
-    destroy_token_sequence(scanner_out);
-    dynarray_destroy(scanner_out);
-    destroy_tables(tables_info);
-    free(value_map);
-    dynadict_destroy(dict_map);
-
-    printf("Saving parsing logs...\n");
-
-    // THERE IS NO CST DESTRUCTION YET
-    if (par_out.CST) {
-        char cst_dir[PATH_MAX];
-        snprintf(cst_dir, sizeof(cst_dir), "%s/%s", parser_logs_dir, "cst_logs.txt");
-        FILE* cst_file_ptr = fopen(cst_dir, "w");
-        export_tree(cst_file_ptr, par_out.CST, "", true, true);
-        fclose(cst_file_ptr);
-
-        //printf("\n--- Parse Tree ---\n");
-        //print_tree(par_out.CST, "", true, true);
-    }
-
-    char ast_dir[PATH_MAX];
-    snprintf(ast_dir, sizeof(ast_dir), "%s/%s", parser_logs_dir, "ast_logs.txt");
-    FILE* ast_file_ptr = fopen(ast_dir, "w");
-    export_ast(ast_file_ptr, par_out.AST.root, "", true, ast_val_map);
-    fclose(ast_file_ptr);
-
-    //printf("\n--- AST ---\n");
-    //print_ast(par_out.AST.root, "", true);
-
-    printf("Freeing tree memory...\n");
-
-    free(ast_val_map);
-    for(int i = 0;i<dynarray_length(ast_mapping);i++){
-        free(ast_mapping[i].key);
-    }
-    dynarray_destroy(ast_mapping);
-    destroy_tree(par_out.CST);
-    destroyAST(par_out.AST);
-
-    printf("Parsing Finished!\n");
-
-    // NEED TO SERIOUSLY FIND A BETTER WAY TO DISPLAY LOGS OMFG
-    return 0;
+    TreeManager ast = parse_pipeline(
+        language_src, 
+        language_regex, 
+        rules_src, 
+        rules_regex, 
+        ignore_categories_language, 
+        ignore_categories_rules, 
+        mapping, symbols_amount, 
+        lexer_dir, parser_dir, 
+        generate_parsing_tables, 
+        generate_lexing_tables, 
+        debug
+    );
 }
